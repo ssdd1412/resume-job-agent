@@ -100,69 +100,90 @@ export function sendMessageStream(
 ): AbortController {
   const ctrl = new AbortController();
 
+  // 本轮是否已经产出过任何事件。用来判断连接断了能不能安全重试：
+  // 已经吐出内容还重试的话，用户会看到重复的半截回答。
+  let producedOutput = false;
+
+  const requestOnce = async (): Promise<void> => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (conversationId) {
+      headers['makers-conversation-id'] = conversationId;
+    }
+
+    const res = await fetch(API.chat, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        message,
+        // userId is camelCase here for parity with claude-agent-starter's
+        // chat handler convention. The backend reads body.userId ?? body.user_id
+        // to be tolerant of both.
+        userId: options?.userId,
+        userMsgId: options?.userMsgId,
+        botMsgId: options?.botMsgId,
+      }),
+      signal: ctrl.signal,
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${await res.text().catch(() => '')}`);
+    }
+
+    const reader = res.body?.getReader();
+    if (!reader) {
+      throw new Error('ReadableStream not supported');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let doneReceived = false;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // SSE format: events separated by \n\n
+      const parts = buffer.split('\n\n');
+      // Last segment may be incomplete — keep in buffer
+      buffer = parts.pop() || '';
+
+      for (const part of parts) {
+        if (!part.trim()) continue;
+        producedOutput = true;
+        dispatchSseChunk(part, callbacks, () => { doneReceived = true; });
+      }
+    }
+
+    // Fallback: trigger done only if backend did not send done event
+    if (!doneReceived) {
+      callbacks.onDone();
+    }
+  };
+
   (async () => {
     try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      if (conversationId) {
-        headers['makers-conversation-id'] = conversationId;
-      }
-
-      const res = await fetch(API.chat, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          message,
-          // userId is camelCase here for parity with claude-agent-starter's
-          // chat handler convention. The backend reads body.userId ?? body.user_id
-          // to be tolerant of both.
-          userId: options?.userId,
-          userMsgId: options?.userMsgId,
-          botMsgId: options?.botMsgId,
-        }),
-        signal: ctrl.signal,
-      });
-
-      if (!res.ok) {
-        callbacks.onError(new Error(`HTTP ${res.status}: ${await res.text().catch(() => '')}`));
-        return;
-      }
-
-      const reader = res.body?.getReader();
-      if (!reader) {
-        callbacks.onError(new Error('ReadableStream not supported'));
-        return;
-      }
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let doneReceived = false;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-
-        // SSE format: events separated by \n\n
-        const parts = buffer.split('\n\n');
-        // Last segment may be incomplete — keep in buffer
-        buffer = parts.pop() || '';
-
-        for (const part of parts) {
-          if (!part.trim()) continue;
-          dispatchSseChunk(part, callbacks, () => { doneReceived = true; });
-        }
-      }
-
-      // Fallback: trigger done only if backend did not send done event
-      if (!doneReceived) {
-        callbacks.onDone();
-      }
+      await requestOnce();
     } catch (err) {
       // AbortError does not trigger error callback
       if (err instanceof DOMException && err.name === 'AbortError') return;
+
+      // 后端重启会让浏览器手里的 keep-alive 连接变成死连接，第一次请求可能
+      // 直接就失败。此时还没有任何输出，换条新连接重试一次是安全的。
+      if (!producedOutput && !ctrl.signal.aborted) {
+        try {
+          await requestOnce();
+          return;
+        } catch (retryErr) {
+          if (retryErr instanceof DOMException && retryErr.name === 'AbortError') return;
+          callbacks.onError(retryErr instanceof Error ? retryErr : new Error(String(retryErr)));
+          return;
+        }
+      }
+
       callbacks.onError(err instanceof Error ? err : new Error(String(err)));
     }
   })();

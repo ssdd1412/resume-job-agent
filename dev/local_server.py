@@ -257,7 +257,11 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-cache, no-transform")
         self.send_header("X-Accel-Buffering", "no")
         self.send_header("Transfer-Encoding", "chunked")
+        # 流式响应不复用连接：服务重启后浏览器手里的 keep-alive 连接会变成
+        # 死连接，下次发消息直接失败。每个 SSE 请求独立一条连接就不会串。
+        self.send_header("Connection", "close")
         self.end_headers()
+        self.close_connection = True
 
         def write(frame: str) -> None:
             data = frame.encode("utf-8")

@@ -29,7 +29,7 @@ const en = {
   "pdf.failed": "Export failed",
 
   // Status & errors
-  "status.error": "Request failed. Please check if the backend service is running.",
+  "status.error": "⚠️ Connection lost. Refresh the page and try again.",
   "status.stopped": "⏹ *Generation stopped*",
   "status.backendError": "Backend abort request failed. The server may still be running.",
 

@@ -29,7 +29,7 @@ const zh = {
   "pdf.failed": "导出失败",
 
   // Status & errors
-  "status.error": "⚠️ 请求失败，请检查后端服务是否启动。",
+  "status.error": "⚠️ 连接已断开，请刷新页面后重新发送。",
   "status.stopped": "⏹ *已停止生成*",
   "status.backendError": "⚠️ 后端中断请求失败，服务端可能仍在运行。",
 
