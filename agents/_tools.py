@@ -276,6 +276,52 @@ def match_jobs(
     )
 
 
+# ========== Tool 4: 导出 PDF ==========
+@function_tool
+def export_resume_pdf(
+    resume_markdown: Annotated[
+        str,
+        "要导出的简历正文（Markdown，通常就是 generate_resume 的返回值原文）。不要传摘要或改写版本。",
+    ],
+    file_name: Annotated[str, "可选：自定义文件名（不带扩展名）"] = "",
+) -> str:
+    """把简历正文渲染成 PDF 文件供用户下载，返回导出结果（文件名/页数/体积）。"""
+    # 延迟导入：reportlab 缺失时不应连带整个 chat 路由启动失败
+    try:
+        from .resume_pdf import build_pdf, suggest_filename, cache_put
+    except Exception as e:  # pragma: no cover
+        return json.dumps(
+            {"ok": False, "error": f"PDF 组件加载失败：{e}"}, ensure_ascii=False
+        )
+
+    md = (resume_markdown or "").strip()
+    if len(md) < 30:
+        return json.dumps(
+            {"ok": False, "error": "简历内容太短，请先调用 generate_resume 生成简历再导出。"},
+            ensure_ascii=False,
+        )
+
+    try:
+        pdf = build_pdf(md)
+    except Exception as e:
+        return json.dumps({"ok": False, "error": f"PDF 渲染失败：{e}"}, ensure_ascii=False)
+
+    pdf_id = cache_put(pdf)
+    name = (file_name or "").strip()
+    filename = f"{name}.pdf" if name else suggest_filename(md)
+
+    return json.dumps(
+        {
+            "ok": True,
+            "pdf_id": pdf_id,
+            "filename": filename,
+            "size_kb": round(len(pdf) / 1024, 1),
+            "note": "系统会自动在回复下方附加「下载 PDF」按钮，你不需要粘贴 Base64 或链接。",
+        },
+        ensure_ascii=False,
+    )
+
+
 # ========== Tool 3: 保存真实招聘信息 ==========
 @function_tool
 def save_jobs(

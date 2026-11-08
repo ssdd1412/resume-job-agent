@@ -215,6 +215,17 @@ class Handler(BaseHTTPRequestHandler):
                 _save_meta(meta)
             return self._json(200, {"status": "deleted"})
 
+        if path == "/export-pdf":
+            # 与线上 agents/export-pdf/index.py 共用同一份 export_payload()
+            try:
+                from eoagents.resume_pdf import export_payload
+            except Exception as e:
+                return self._json(500, {"ok": False, "error": f"PDF 组件加载失败：{e}"})
+            result = export_payload(
+                body.get("markdown") or "", (body.get("file_name") or "").strip()
+            )
+            return self._json(200 if result.get("ok") else 400, result)
+
         if path == "/clear-history":
             cid = str(body.get("conversation_id") or "")
 

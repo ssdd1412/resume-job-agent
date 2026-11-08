@@ -32,9 +32,13 @@ function openDb(): Promise<IDBDatabase> {
 }
 
 export async function saveSnapshot(conversationId: string, messages: Message[]): Promise<void> {
+  // PDF 的 base64 体积可达数十 KB，不写进快照 —— 恢复后按钮会自动
+  // 回退到调用 /export-pdf 重新生成，体验一致但不占配额。
+  const slim = messages.map(({ pdf: _pdf, ...rest }) => rest);
+
   const record: SnapshotRecord = {
     conversationId,
-    messages,
+    messages: slim,
     updatedAt: Date.now(),
   };
 

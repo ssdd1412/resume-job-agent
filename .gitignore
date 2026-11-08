@@ -43,3 +43,5 @@ AGENTS.md
 # 本地运行器产生的会话数据
 .local_conversations.db
 .local_conversations.json
+.local_conversations.db-shm
+.local_conversations.db-wal

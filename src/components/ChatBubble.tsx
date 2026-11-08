@@ -1,8 +1,10 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import type { Message } from '../types';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useT } from '../i18n';
+import { exportResumePdf } from '../api';
+import { downloadPdf } from '../lib/downloadPdf';
 import styles from './ChatBubble.module.css';
 
 interface Props {
@@ -65,10 +67,41 @@ function normalizeMarkdown(content: string): string {
 }
 
 export default memo(function ChatBubble({ message }: Props) {
-  const { lang } = useT();
+  const { t, lang } = useT();
   const isUser = message.role === 'user';
 
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+
   if (!isUser && !message.content) return null;
+
+  // 刷新页面后从 /history 恢复的消息没有 isResume 标记，
+  // 用简历的固定结构特征兜底识别，保证历史消息也能下载 PDF。
+  const looksLikeResume =
+    !isUser &&
+    /^#\s+\S+/m.test(message.content) &&
+    /##\s*(个人简介|专业技能|教育背景|工作经历|项目经历|技能|经历)/.test(message.content);
+
+  const canDownloadPdf =
+    !isUser && (message.isResume || !!message.pdf || looksLikeResume) && !message.streaming;
+
+  const handleDownloadPdf = async () => {
+    // 优先用后端已经推下来的字节，避免二次生成
+    if (message.pdf?.base64) {
+      downloadPdf(message.pdf);
+      return;
+    }
+    setPdfBusy(true);
+    setPdfError(null);
+    try {
+      const pdf = await exportResumePdf(message.content);
+      downloadPdf(pdf);
+    } catch (e) {
+      setPdfError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPdfBusy(false);
+    }
+  };
 
   return (
     <div className={`${styles.row} ${isUser ? styles.userRow : styles.botRow}`}>
@@ -81,6 +114,27 @@ export default memo(function ChatBubble({ message }: Props) {
             <Markdown remarkPlugins={[remarkGfm]}>{normalizeMarkdown(message.content)}</Markdown>
           </div>
         )}
+
+        {canDownloadPdf && (
+          <div className={styles.pdfBar}>
+            <button
+              type="button"
+              className={styles.pdfBtn}
+              onClick={handleDownloadPdf}
+              disabled={pdfBusy}
+            >
+              <span aria-hidden="true">{pdfBusy ? '⏳' : '⬇'}</span>
+              {pdfBusy ? t('pdf.generating') : t('pdf.download')}
+            </button>
+            {message.pdf?.size ? (
+              <span className={styles.pdfMeta}>
+                {message.pdf.filename} · {Math.max(1, Math.round(message.pdf.size / 1024))} KB
+              </span>
+            ) : null}
+            {pdfError && <span className={styles.pdfErr}>{t('pdf.failed')}: {pdfError}</span>}
+          </div>
+        )}
+
         <span className={styles.time}>
           {new Date(message.timestamp).toLocaleTimeString(lang === 'zh' ? 'zh-CN' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
         </span>

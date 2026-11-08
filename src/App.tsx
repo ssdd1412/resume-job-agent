@@ -24,16 +24,18 @@ import { I18nProvider, LangToggle, useT, MessageKeys } from './i18n';
 import { deleteSnapshot, loadSnapshot, saveSnapshot } from './lib/chatUiStore';
 import styles from './App.module.css';
 
-const LAMP_IDS = ['generate_resume', 'match_jobs', 'save_jobs'] as const;
+const LAMP_IDS = ['generate_resume', 'match_jobs', 'save_jobs', 'export_resume_pdf'] as const;
 const LAMP_ICONS: Record<string, string> = {
   generate_resume: '📄',
   match_jobs: '🎯',
   save_jobs: '💾',
+  export_resume_pdf: '📥',
 };
 const LAMP_I18N_KEYS: Record<string, string> = {
   generate_resume: 'tool.resume',
   match_jobs: 'tool.match',
   save_jobs: 'tool.save',
+  export_resume_pdf: 'tool.pdf',
 };
 
 const CONVERSATION_ID_STORAGE_KEY = 'eo_conversation_id';
@@ -347,6 +349,24 @@ function AppInner() {
     const ctrl = sendMessageStream(text, {
       onTextDelta(delta) {
         updateBotMessage(content => content + delta);
+      },
+
+      onResumeReady() {
+        // 后端确认这一屏是简历 → 气泡底部出现「下载 PDF」入口
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === botMsgIdRef.current ? { ...m, isResume: true } : m
+          )
+        );
+      },
+
+      onPdfReady(pdf) {
+        // 模型调用了 export_resume_pdf，后端把字节直接推下来了
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === botMsgIdRef.current ? { ...m, isResume: true, pdf } : m
+          )
+        );
       },
 
       onToolCalled(toolName) {

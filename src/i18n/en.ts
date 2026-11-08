@@ -6,7 +6,7 @@ const en = {
   // Empty state
   "empty.title": "Resume Builder + Job Matcher",
   "empty.hint": "Tell me your real name, target role, education, skills and experience — I'll turn it into a ready-to-send Markdown resume. Then paste real job postings and I'll score each requirement: what matches, and what's still missing.",
-  "empty.features": "Resume Builder · Job Matching · Job Store · Session Memory",
+  "empty.features": "Resume Builder · Job Matching · Job Store · PDF Export · Session Memory",
 
   // Chat input
   "chat.placeholder": "Type a message...  ⏎ Send · Shift+⏎ Newline",
@@ -15,11 +15,18 @@ const en = {
   // Preset questions
   "preset.1": "Build my resume: I'm Zhang San, CS undergrad, Python/SQL/data analysis, built a medical NER project and an e-commerce dashboard",
   "preset.2": "Match me against the real jobs in the job store and tell me where my gaps are",
+  "preset.3": "Export the resume you just built as a PDF so I can send it out",
 
   // Tool indicators
   "tool.resume": "Resume",
   "tool.match": "Match",
   "tool.save": "Save jobs",
+  "tool.pdf": "PDF export",
+
+  // PDF export
+  "pdf.download": "Download PDF",
+  "pdf.generating": "Generating...",
+  "pdf.failed": "Export failed",
 
   // Status & errors
   "status.error": "Request failed. Please check if the backend service is running.",

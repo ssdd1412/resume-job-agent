@@ -3,6 +3,7 @@
  *
  * Route mapping (file → route):
  *   agents/chat/index.ts                         → POST /chat                  Main chat endpoint (SSE)
+ *   agents/export-pdf/index.ts                   → POST /export-pdf           Resume Markdown → PDF (base64)
  *   agents/stop/index.ts                         → POST /stop                  Abort the active agent run
  *   cloud-functions/history/index.ts             → POST /history               Get conversation history
  *   cloud-functions/conversations/index.ts       → POST /conversations         List conversations for a user
@@ -14,6 +15,7 @@
 
 import type {
   Message,
+  PdfPayload,
   ListConversationsParams,
   ListConversationsResponse,
 } from './types';
@@ -21,6 +23,7 @@ import type {
 export const API = {
   chat: '/chat',
   chatStop: '/stop',                        // Abort the active agent run
+  exportPdf: '/export-pdf',                 // Render resume Markdown → PDF (base64)
   history: '/history',                      // Get conversation history
   clearHistory: '/clear-history',           // Clear messages in a conversation
   conversations: '/conversations',          // List conversations for a user
@@ -37,6 +40,10 @@ export interface RawSseEvent {
 export interface StreamCallbacks {
   onTextDelta: (delta: string) => void;
   onToolCalled: (toolName: string) => void;
+  /** Backend injected a resume into this message (resume_ready). */
+  onResumeReady?: () => void;
+  /** Backend pushed a ready-to-download PDF (pdf_ready). */
+  onPdfReady?: (pdf: PdfPayload) => void;
   onDone: () => void;
   onError: (err: Error) => void;
   onRawEvent?: (event: RawSseEvent) => void;
@@ -163,6 +170,20 @@ export function sendMessageStream(
   return ctrl;
 }
 
+/**
+ * 调试面板只需要知道「发生了一个 pdf_ready」，不需要把整份 PDF 的 Base64
+ * 铺满屏幕。这里把字节字段换成体积摘要，其余字段原样保留。
+ */
+function stripHeavyPayload(parsed: unknown): unknown {
+  if (!parsed || typeof parsed !== 'object') return parsed;
+  const obj = parsed as Record<string, unknown>;
+  if (typeof obj.base64 !== 'string') return parsed;
+
+  const { base64, ...rest } = obj;
+  const bytes = Math.round((base64.length * 3) / 4);
+  return { ...rest, base64: `<${bytes} bytes 二进制，已在调试面板省略>` };
+}
+
 /** Parse a single SSE event and dispatch to the corresponding callback */
 function dispatchSseChunk(part: string, cb: StreamCallbacks, markDone: () => void): void {
   let eventType = '';
@@ -184,8 +205,8 @@ function dispatchSseChunk(part: string, cb: StreamCallbacks, markDone: () => voi
     if (cb.onRawEvent) {
       cb.onRawEvent({
         eventType,
-        data: parsed,
-        raw: data,
+        data: stripHeavyPayload(parsed),
+        raw: data.length > 400 ? `${data.slice(0, 400)}…（已截断，共 ${data.length} 字符）` : data,
         timestamp: Date.now(),
       });
     }
@@ -196,6 +217,16 @@ function dispatchSseChunk(part: string, cb: StreamCallbacks, markDone: () => voi
         break;
       case 'tool_called':
         cb.onToolCalled(parsed.tool);
+        break;
+      case 'resume_ready':
+        cb.onResumeReady?.();
+        break;
+      case 'pdf_ready':
+        cb.onPdfReady?.({
+          filename: parsed.filename || '简历.pdf',
+          base64: parsed.base64 || '',
+          size: parsed.size,
+        });
         break;
       case 'error':
         cb.onError(new Error(parsed.message || 'agent returned error'));
@@ -336,4 +367,35 @@ export async function deleteConversation(
   } catch {
     return false;
   }
+}
+
+/**
+ * Render resume Markdown into a PDF and return the base64 payload.
+ *
+ * Stateless: the backend rebuilds the PDF from the Markdown every call, so
+ * this works even when the original agent run happened in another instance.
+ */
+export async function exportResumePdf(
+  markdown: string,
+  fileName?: string,
+): Promise<PdfPayload> {
+  const res = await fetch(API.exportPdf, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ markdown, file_name: fileName }),
+  });
+
+  const data = (await res.json().catch(() => null)) as
+    | (PdfPayload & { ok?: boolean; error?: string })
+    | null;
+
+  if (!res.ok || !data?.base64) {
+    throw new Error(data?.error || `导出失败（HTTP ${res.status}）`);
+  }
+
+  return {
+    filename: data.filename || '简历.pdf',
+    base64: data.base64,
+    size: data.size,
+  };
 }
