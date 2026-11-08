@@ -80,6 +80,22 @@ git push -u origin main
 5. 框架**自动识别**为 `openai-agents-sdk`（因为项目根目录 `edgeone.json` 里已声明 `framework`）。
 
    > 💡 **重要**：正因为声明了框架，Makers 部署后会**自动注入** `AI_GATEWAY_API_KEY` / `AI_GATEWAY_BASE_URL` / `AI_GATEWAY_MODEL` 三个环境变量。你**不需要自己填 Key**，开箱即用，默认用免费模型 `@makers/deepseek-v4-flash`。
+   >
+   > ⚠️ **但如果你想换成自己的模型（比如百炼 qwen-plus），不要用 `AI_GATEWAY_*` 这套变量名。**
+   > `AI_GATEWAY_*` 是平台保留前缀，实测平台会把 `AI_GATEWAY_BASE_URL` 强制改写成 `https://ai-gateway.edgeone.link/v1`，
+   > 而 `AI_GATEWAY_API_KEY` 仍是你填的百炼 Key，两者拼起来就成了「百炼的 Key + 平台的网关地址」，
+   > 调用统一返回 `401 Invalid API key`，且从控制台看不出任何异常。
+   >
+   > 正确做法：用独立命名的变量（本项目代码已按此顺序读取）：
+   >
+   > | 变量名 | 示例值 |
+   > |---|---|
+   > | `DASHSCOPE_API_KEY` | `sk-xxxxxxxx` |
+   > | `DASHSCOPE_BASE_URL` | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
+   > | `DASHSCOPE_MODEL` | `qwen-plus` |
+   >
+   > 代码逻辑：优先读 `DASHSCOPE_*`，缺失时回退到 `AI_GATEWAY_*`（兼容平台默认模型与本地 `.env`）。
+   > 改完环境变量后**必须重新部署一次**才会生效（变量不会热更新）。
 6. 点 **部署**。等几十秒～一两分钟，页面会显示一个 `https://xxxx.makershost.com` 的链接。
 
 ### 第 6 步：打开试一试
@@ -88,9 +104,14 @@ git push -u origin main
 - 再发："帮我匹配适合的工作" → Agent 调 `match_jobs` 对你 `jobs.json` 里 40 条真实岗位打分排序。
 
 ### 第 7 步（可选）：绑定你自己的域名
-- 预览域名 `*.makershost.com` **有时效限制**，正式长期用建议绑自己的域名。
-- 在 Makers 项目 **设置 → 自定义域名** 里填入你的域名（如 `resume.example.com`）。
-- 按提示去你的域名服务商做一条 **CNAME 解析**指向 Makers 给的地址。
+- 预设域名形如 `https://<项目名>-<随机串>.edgeone.cool`，**默认带访问鉴权**：直接打开会返回
+  `401 UNAUTHORIZED`（`X-EOP-MSG: wrong token`），必须用控制台「预览」按钮给出的
+  `?eo_token=xxx&eo_time=xxx` 链接访问，且约 3 小时后失效。
+- 所以「发给别人也能直接打开」只能靠绑定自定义域名。
+- 在项目 **设置 → 域名管理 → 添加自定义域名** 填入你的域名（如 `resume.example.com`），勾选「自动生成免费证书」。
+- 按提示去域名服务商加一条 **CNAME 解析**指向控制台给出的地址，回控制台点「验证」。
+- 注意备案：加速区域为「中国大陆」或「全球（含中国大陆）」时，**域名必须先完成 ICP 备案**；
+  选「全球（不含中国大陆）」则不需要备案，但国内访问会慢。
 - Makers **自动申请并续期免费 HTTPS 证书**，不用你管。
 
 ---
