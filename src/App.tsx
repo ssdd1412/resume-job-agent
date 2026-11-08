@@ -423,9 +423,12 @@ function AppInner() {
         void refreshConversations('replace');
       },
 
-      onError() {
+      onError(err) {
         clearBotStreaming();
-        updateBotMessage(content => content || t("status.error"));
+        // 把真实原因带出来：只显示一句「连接已断开」会把 4xx/5xx 和网络异常
+        // 混成同一个样子，出问题时根本没法判断是后端崩了还是请求没发出去。
+        const detail = err?.message ? `\n\n\`${err.name}: ${err.message.slice(0, 300)}\`` : '';
+        updateBotMessage(content => content || `${t("status.error")}${detail}`);
         finishStream();
       },
     }, conversationIdRef.current, {

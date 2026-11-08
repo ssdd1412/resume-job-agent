@@ -179,14 +179,21 @@ export function sendMessageStream(
           return;
         } catch (retryErr) {
           if (retryErr instanceof DOMException && retryErr.name === 'AbortError') return;
-          callbacks.onError(retryErr instanceof Error ? retryErr : new Error(String(retryErr)));
+          callbacks.onError(decorate(retryErr));
           return;
         }
       }
 
-      callbacks.onError(err instanceof Error ? err : new Error(String(err)));
+      callbacks.onError(decorate(err));
     }
   })();
+
+  /** 把「请求发到哪儿、页面在哪儿」附在错误上，否则远端和本地环境很难区分。 */
+  function decorate(err: unknown): Error {
+    const base = err instanceof Error ? err : new Error(String(err));
+    const target = `${window.location.origin}${API.chat}`;
+    return new Error(`${base.message}（请求地址 ${target}）`);
+  }
 
   return ctrl;
 }
