@@ -177,3 +177,97 @@
   letter-spacing: .04em;
   text-align: center;
 }
+
+/* ── 简历上传 ───────────────────────────────────────────── */
+/* 拖拽高亮：整条输入栏描边，提示「松手就能传」 */
+.barDragging {
+  outline: 1px dashed var(--accent-gold);
+  outline-offset: -6px;
+  background: var(--accent-gold-dim);
+}
+
+.fileInput { display: none; }
+
+.attachBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px dashed var(--bg-border);
+  background: transparent;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-bottom: 1px;
+  transition: color var(--transition-fast),
+              border-color var(--transition-fast),
+              background var(--transition-fast),
+              transform var(--transition-fast);
+}
+.attachBtn:hover:not(:disabled) {
+  color: var(--accent-gold);
+  border-color: var(--accent-gold);
+  background: var(--accent-gold-dim);
+  transform: scale(1.06);
+}
+.attachBtn:active:not(:disabled) { transform: scale(.94); }
+.attachBtn:disabled { opacity: .35; cursor: not-allowed; }
+
+/* 已解析文件的小卡片 */
+.attachChip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 5px 8px 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-gold-dim);
+  background: var(--bg-elevated);
+  font-size: .68rem;
+  animation: chipIn .18s ease-out;
+}
+.attachChipMuted { opacity: .75; border-style: dashed; }
+
+@keyframes chipIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.attachIcon { font-size: .8rem; line-height: 1; }
+
+.attachName {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachMeta {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.attachRemove {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+.attachRemove:hover { color: #e74c3c; }
+
+.attachError {
+  font-size: .66rem;
+  color: #e07a6f;
+  line-height: 1.5;
+  word-break: break-word;
+}

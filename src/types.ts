@@ -33,6 +33,21 @@ export interface PdfPayload {
   size?: number;
 }
 
+/**
+ * 用户上传的已有简历（已解析成纯文本）。
+ * 只存在前端内存里，随消息一起发给后端；后端不落盘。
+ */
+export interface ResumeAttachment {
+  /** 原始文件名，例如 陈静-简历.pdf */
+  name: string;
+  /** 解析出的纯文本正文 */
+  text: string;
+  /** 正文字数 */
+  chars: number;
+  /** PDF 页数（非 PDF 时为空） */
+  pages?: number;
+}
+
 export interface ToolLampState {
   id: string;
   label: string;

@@ -5,6 +5,8 @@
   POST /chat                  → 复用 agents/chat/index.py 的 agent + SSE 流
   POST /stop                  → 中断当前生成
   POST /history               → 读取会话历史（SQLiteSession）
+  POST /export-pdf            → 简历 Markdown 渲染成 PDF（与线上同源）
+  POST /parse-resume          → 上传的 PDF/DOCX/TXT 简历抽成纯文本
   POST /conversations         → 侧边栏会话列表
   POST /delete-conversation   → 删除会话
   GET  /*                     → 返回 dist/ 里的前端构建产物
@@ -223,6 +225,17 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(500, {"ok": False, "error": f"PDF 组件加载失败：{e}"})
             result = export_payload(
                 body.get("markdown") or "", (body.get("file_name") or "").strip()
+            )
+            return self._json(200 if result.get("ok") else 400, result)
+
+        if path == "/parse-resume":
+            # 与线上 agents/parse-resume/index.py 共用同一份 parse_resume_payload()
+            try:
+                from eoagents.resume_parser import parse_resume_payload
+            except Exception as e:
+                return self._json(500, {"ok": False, "error": f"文件解析组件加载失败：{e}"})
+            result = parse_resume_payload(
+                (body.get("file_name") or "").strip(), body.get("base64") or ""
             )
             return self._json(200 if result.get("ok") else 400, result)
 

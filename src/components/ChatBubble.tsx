@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm';
 import { useT } from '../i18n';
 import { exportResumePdf } from '../api';
 import { downloadPdf } from '../lib/downloadPdf';
+import { foldResumeSource } from '../lib/resumeAttachment';
 import styles from './ChatBubble.module.css';
 
 interface Props {
@@ -108,7 +109,8 @@ export default memo(function ChatBubble({ message }: Props) {
       {!isUser && <div className={styles.avatar}>⬡</div>}
       <div className={`${styles.bubble} ${isUser ? styles.userBubble : styles.botBubble}`}>
         {isUser ? (
-          message.content
+          // 上传简历时后端存的是带原文的整段消息，气泡里折回一行附件说明
+          foldResumeSource(message.content)
         ) : (
           <div className={`${styles.markdown} ${message.streaming ? styles.markdownStreaming : ''}`}>
             <Markdown remarkPlugins={[remarkGfm]}>{normalizeMarkdown(message.content)}</Markdown>

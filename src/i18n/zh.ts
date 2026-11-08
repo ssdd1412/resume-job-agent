@@ -5,12 +5,21 @@ const zh = {
 
   // Empty state
   "empty.title": "简历生成 + 工作匹配 Agent",
-  "empty.hint": "把你真实的姓名、求职意向、教育、技能、项目/实习经历告诉我，我帮你整理成一份可直接投递的 Markdown 简历；再把真实招聘信息贴给我，我会逐条比对岗位要求，给出匹配度、命中项和待补强缺口。",
-  "empty.features": "简历生成 · 岗位匹配 · 招聘入库 · PDF 导出 · 会话记忆",
+  "empty.hint": "把你的姓名、求职意向、教育、技能、项目/实习经历告诉我，我帮你整理成一份可直接投递的简历；也可以直接上传一份已有简历（PDF / DOCX），我在原稿上逐段改写润色、指出哪句话最容易被筛掉。再把真实招聘信息贴给我，我会逐条比对岗位要求，给出匹配度、命中项和待补强缺口。",
+  "empty.features": "简历生成 · 简历润色 · 岗位匹配 · 招聘入库 · PDF 导出 · 会话记忆",
 
   // Chat input
-  "chat.placeholder": "发消息…  ⏎ 发送 · Shift+⏎ 换行",
+  "chat.placeholder": "发消息，或把简历文件拖进来…  ⏎ 发送 · Shift+⏎ 换行",
   "chat.hint": "由 OpenAI Agents SDK + EdgeOne Makers 驱动 · 不编造任何经历与岗位",
+
+  // Resume upload & polish
+  "tool.polish": "简历润色",
+  "attach.button": "上传简历",
+  "attach.parsing": "正在解析…",
+  "attach.remove": "移除附件",
+  "attach.hint": "上传 PDF / DOCX / TXT 简历，在原稿上改写润色（最大 10MB）",
+  "attach.failed": "解析失败",
+  "attach.defaultPrompt": "请帮我修改润色这份简历：保留全部真实经历，把表达改得更专业、更贴合目标岗位。",
 
   // Preset questions
   "preset.1": "帮我生成简历：我叫张三，本科计算机专业，会 Python/SQL/数据分析，做过医疗 NER 项目和电商数据看板",

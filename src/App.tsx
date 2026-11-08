@@ -3,6 +3,7 @@ import type {
   Message,
   ToolLampState,
   ConversationSummary,
+  ResumeAttachment,
 } from './types';
 import {
   fetchConversationHistory,
@@ -22,17 +23,26 @@ import GitHubLink from './components/GitHubLink';
 import DeployLink from './components/DeployLink';
 import { I18nProvider, LangToggle, useT, MessageKeys } from './i18n';
 import { deleteSnapshot, loadSnapshot, saveSnapshot } from './lib/chatUiStore';
+import { buildResumePrompt, attachmentDisplayText } from './lib/resumeAttachment';
 import styles from './App.module.css';
 
-const LAMP_IDS = ['generate_resume', 'match_jobs', 'save_jobs', 'export_resume_pdf'] as const;
+const LAMP_IDS = [
+  'generate_resume',
+  'polish_resume',
+  'match_jobs',
+  'save_jobs',
+  'export_resume_pdf',
+] as const;
 const LAMP_ICONS: Record<string, string> = {
   generate_resume: '📄',
+  polish_resume: '✨',
   match_jobs: '🎯',
   save_jobs: '💾',
   export_resume_pdf: '📥',
 };
 const LAMP_I18N_KEYS: Record<string, string> = {
   generate_resume: 'tool.resume',
+  polish_resume: 'tool.polish',
   match_jobs: 'tool.match',
   save_jobs: 'tool.save',
   export_resume_pdf: 'tool.pdf',
@@ -281,14 +291,18 @@ function AppInner() {
     abortCtrlRef.current = null;
   }, []);
 
-  const handleSend = useCallback(async (text: string) => {
+  const handleSend = useCallback(async (text: string, attachment?: ResumeAttachment) => {
     initDoneRef.current = true;
     setRightPanelMode('debug');
+
+    // 气泡里只显示「要求 + 附件说明」，真正发给后端的是带原文的完整消息：
+    // 模型必须看到全文才能润色，用户不必在聊天窗口里滚动几千字。
+    const requestText = attachment ? buildResumePrompt(text, attachment) : text;
 
     const userMsg: Message = {
       id: crypto.randomUUID(),
       role: 'user',
-      content: text,
+      content: attachment ? attachmentDisplayText(text, attachment) : text,
       timestamp: Date.now(),
     };
 
@@ -315,7 +329,7 @@ function AppInner() {
      * which can correct the title if the runtime later overrides it.
      */
     let sidebarPrimed = false;
-    const cleanedText = text.replace(/\s+/g, ' ').trim();
+    const cleanedText = (text || attachment?.name || '').replace(/\s+/g, ' ').trim();
     const optimisticTitle =
       cleanedText.length === 0 ? 'New chat'
         : cleanedText.length <= 8 ? cleanedText
@@ -346,7 +360,7 @@ function AppInner() {
       });
     };
 
-    const ctrl = sendMessageStream(text, {
+    const ctrl = sendMessageStream(requestText, {
       onTextDelta(delta) {
         updateBotMessage(content => content + delta);
       },

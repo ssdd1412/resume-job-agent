@@ -5,12 +5,21 @@ const en = {
 
   // Empty state
   "empty.title": "Resume Builder + Job Matcher",
-  "empty.hint": "Tell me your real name, target role, education, skills and experience — I'll turn it into a ready-to-send Markdown resume. Then paste real job postings and I'll score each requirement: what matches, and what's still missing.",
-  "empty.features": "Resume Builder · Job Matching · Job Store · PDF Export · Session Memory",
+  "empty.hint": "Tell me your name, target role, education, skills and experience and I'll turn it into a ready-to-send resume. You can also upload an existing resume (PDF / DOCX) and I'll rewrite it line by line and flag the wording a recruiter would skip. Then paste real job postings and I'll score each requirement: what matches, and what's still missing.",
+  "empty.features": "Resume Builder · Resume Polish · Job Matching · Job Store · PDF Export · Session Memory",
 
   // Chat input
-  "chat.placeholder": "Type a message...  ⏎ Send · Shift+⏎ Newline",
+  "chat.placeholder": "Type a message, or drop a resume file here...  ⏎ Send · Shift+⏎ Newline",
   "chat.hint": "Powered by OpenAI Agents SDK + EdgeOne Makers · no fabricated experience or jobs",
+
+  // Resume upload & polish
+  "tool.polish": "Polish",
+  "attach.button": "Upload resume",
+  "attach.parsing": "Parsing...",
+  "attach.remove": "Remove attachment",
+  "attach.hint": "Upload a PDF / DOCX / TXT resume and I'll rewrite it in place (max 10MB)",
+  "attach.failed": "Parse failed",
+  "attach.defaultPrompt": "Please polish this resume: keep every real experience, and make the wording more professional and better aligned with the target role.",
 
   // Preset questions
   "preset.1": "Build my resume: I'm Zhang San, CS undergrad, Python/SQL/data analysis, built a medical NER project and an e-commerce dashboard",

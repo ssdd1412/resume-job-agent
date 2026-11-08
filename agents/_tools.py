@@ -11,9 +11,11 @@ Agent Tools — 简历生成 + 工作匹配（替换 openai-agent-starter-python
   为空时回退读取 jobs.json。
 """
 
+import contextvars
 import json
 import os
 import re
+import uuid
 from typing import Annotated
 
 from agents import function_tool
@@ -320,6 +322,135 @@ def export_resume_pdf(
         },
         ensure_ascii=False,
     )
+
+
+# ========== Tool 5: 润色定稿（用户上传已有简历时）==========
+# 润色内容是模型自己写出来的，没法像 generate_resume 那样由后端照抄参数渲染，
+# 因此让模型把定稿正文交回给工具，工具存进进程内缓存、只回一个 rid；
+# chat 路由拿到 rid 后把正文原样推给前端，避免模型二次复述时被摘要/截断。
+_POLISH_CACHE: dict[str, str] = {}
+_POLISH_ORDER: list[str] = []
+_POLISH_MAX = 8
+
+# 用户上传的简历原文（由 chat 路由在每次请求开始时写入）。
+# 用 ContextVar 而不是全局变量：同一个进程会并发处理多个会话，
+# 全局变量会导致 A 用户的简历被拿去校验 B 用户的润色结果。
+_RESUME_SOURCE: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "resume_source", default=""
+)
+# 同一个请求内 polish_resume 被调用的次数：第一次发现编造数字时打回重写，
+# 第二次起放行（避免模型反复提交不收敛，把轮次耗光）。
+_POLISH_ATTEMPT: contextvars.ContextVar[int] = contextvars.ContextVar(
+    "polish_attempt", default=0
+)
+
+RESUME_SOURCE_START = "<<<RESUME_SOURCE>>>"
+RESUME_SOURCE_END = "<<<END_RESUME_SOURCE>>>"
+
+# 行首的 "1." / "2)" 是 Markdown 有序列表编号，不是简历内容里的数据，
+# 不排除掉的话每次润色都会被误判成「编造了 1、2、3」。
+_LIST_MARKER = re.compile(r"^\s*\d+\s*[.)、]\s+", re.MULTILINE)
+_NUM = re.compile(r"\d+(?:\.\d+)?")
+
+
+def set_resume_source(raw_message: str) -> str:
+    """从用户消息里取出上传的简历原文，存入当前请求的 ContextVar。"""
+    start = raw_message.find(RESUME_SOURCE_START)
+    body = ""
+    if start >= 0:
+        begin = start + len(RESUME_SOURCE_START)
+        end = raw_message.find(RESUME_SOURCE_END, begin)
+        body = raw_message[begin:end] if end > begin else raw_message[begin:]
+    _RESUME_SOURCE.set(body.strip())
+    _POLISH_ATTEMPT.set(0)
+    return body.strip()
+
+
+def _numbers(text: str) -> set[str]:
+    return set(_NUM.findall(_LIST_MARKER.sub("", text or "")))
+
+
+def _invented_numbers(markdown: str, source: str) -> list[str]:
+    """定稿里出现了、但原文没有的数字（按出现顺序去重）。"""
+    if not source:
+        return []
+    return sorted(_numbers(markdown) - _numbers(source))
+
+
+def polish_cache_get(rid: str) -> str | None:
+    return _POLISH_CACHE.get(rid)
+
+
+def _polish_cache_put(text: str) -> str:
+    rid = uuid.uuid4().hex
+    _POLISH_CACHE[rid] = text
+    _POLISH_ORDER.append(rid)
+    while len(_POLISH_ORDER) > _POLISH_MAX:
+        _POLISH_CACHE.pop(_POLISH_ORDER.pop(0), None)
+    return rid
+
+
+@function_tool
+def polish_resume(
+    resume_markdown: Annotated[
+        str,
+        "润色后的【完整】简历正文（Markdown）。必须逐段写出全部内容：姓名标题行用「# 姓名」，"
+        "每个板块用「## 板块名」，条目用「- 」。禁止只给修改建议、禁止用「……」省略原文段落。",
+    ],
+    original_name: Annotated[str, "可选：用户上传的原始文件名，例如 陈静-简历.pdf"] = "",
+) -> str:
+    """提交润色完成的简历定稿。系统会把这份正文完整展示在对话里，并提供 PDF 下载。"""
+    md = (resume_markdown or "").strip()
+    if len(md) < 80:
+        return json.dumps(
+            {
+                "ok": False,
+                "error": (
+                    "正文太短，看起来不是完整简历。请把你的润色结果一次性完整写出来："
+                    "以「# 姓名」开头，包含个人简介/技能/教育/经历等原有全部板块，再调用一次。"
+                ),
+            },
+            ensure_ascii=False,
+        )
+
+    # 事实校验：润色只改表达，不能凭空造出数字。
+    source = _RESUME_SOURCE.get()
+    invented: list[str] = _invented_numbers(md, source)
+    if invented:
+        if _POLISH_ATTEMPT.get() == 0:
+            _POLISH_ATTEMPT.set(1)
+            return json.dumps(
+                {
+                    "ok": False,
+                    "error": (
+                        "你的定稿里出现了原文没有的数字："
+                        + "、".join(invented[:12])
+                        + "。这属于编造事实，不能提交。"
+                        "处理方式：原文已有的数字可以保留；原文没给具体值的地方，"
+                        "要么不写数字，要么写成「（建议补充：具体数据）」占位。"
+                        "请修正后重新调用 polish_resume，把完整正文再交一次。"
+                    ),
+                    "invented_numbers": invented[:12],
+                },
+                ensure_ascii=False,
+            )
+
+    rid = _polish_cache_put(md)
+    name = (original_name or "").strip()
+    payload = {
+        "ok": True,
+        "rid": rid,
+        "chars": len(md),
+        "original_name": name,
+        "note": "定稿已提交，正文由系统展示，你不需要再复述一遍；请只补充改动说明与待确认事项。",
+    }
+    if invented:
+        # 第二次提交仍有新数字：放行（避免死循环），但明确要求模型在正文里说明哪些是待确认的估算
+        payload["fact_warning"] = (
+            "以下数字原文没有出现，仍被保留：" + "、".join(invented[:12])
+            + "。请在回复里明确标注这些数字需要用户确认，或直接改掉。"
+        )
+    return json.dumps(payload, ensure_ascii=False)
 
 
 # ========== Tool 3: 保存真实招聘信息 ==========

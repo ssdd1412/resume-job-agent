@@ -16,6 +16,7 @@
 import type {
   Message,
   PdfPayload,
+  ResumeAttachment,
   ListConversationsParams,
   ListConversationsResponse,
 } from './types';
@@ -24,6 +25,7 @@ export const API = {
   chat: '/chat',
   chatStop: '/stop',                        // Abort the active agent run
   exportPdf: '/export-pdf',                 // Render resume Markdown → PDF (base64)
+  parseResume: '/parse-resume',             // Uploaded PDF/DOCX/TXT → plain text
   history: '/history',                      // Get conversation history
   clearHistory: '/clear-history',           // Clear messages in a conversation
   conversations: '/conversations',          // List conversations for a user
@@ -425,5 +427,59 @@ export async function exportResumePdf(
     filename: data.filename || '简历.pdf',
     base64: data.base64,
     size: data.size,
+  };
+}
+
+/** 上传上限，和 agents/resume_parser.py 的 MAX_BYTES 保持一致。 */
+export const MAX_RESUME_FILE_BYTES = 10 * 1024 * 1024;
+
+/** FileReader → 去掉 data URL 前缀的裸 Base64。 */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () => reject(new Error('读取文件失败，请重试'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * 把用户上传的 PDF / DOCX / TXT 简历解析成纯文本。
+ *
+ * 解析放在后端做（pypdf + 标准库 docx 解析），前端只负责读成 Base64，
+ * 这样浏览器不需要引入几百 KB 的 PDF 解析库。
+ */
+export async function parseResumeFile(file: File): Promise<ResumeAttachment> {
+  if (file.size > MAX_RESUME_FILE_BYTES) {
+    throw new Error(
+      `文件 ${(file.size / 1024 / 1024).toFixed(1)}MB，超过 10MB 上限，请压缩后再上传`,
+    );
+  }
+
+  const base64 = await fileToBase64(file);
+
+  const res = await fetch(API.parseResume, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ file_name: file.name, base64 }),
+  });
+
+  const data = (await res.json().catch(() => null)) as
+    | { ok?: boolean; filename?: string; text?: string; chars?: number; pages?: number; error?: string }
+    | null;
+
+  if (!res.ok || !data?.ok || !data.text) {
+    throw new Error(data?.error || `解析失败（HTTP ${res.status}）`);
+  }
+
+  return {
+    name: data.filename || file.name,
+    text: data.text,
+    chars: data.chars ?? data.text.length,
+    pages: data.pages,
   };
 }

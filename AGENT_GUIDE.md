@@ -1,7 +1,7 @@
 # 简历生成 + 工作匹配 Agent
 
 基于 `TencentEdgeOne/openai-agent-starter-python` 改造：把默认的「天气 / 穿衣 / 翻译 / 统计」四个示例工具，
-换成 **简历生成、岗位匹配、招聘入库** 三个真实工具，可本地运行，也可一键部署到 EdgeOne Makers。
+换成 **简历生成、简历润色、岗位匹配、招聘入库、PDF 导出** 五个真实工具，可本地运行，也可一键部署到 EdgeOne Makers。
 
 - 文档1：从 0 到 1 做一个 AI Agent（环境搭建 → 开发 → 部署 → 绑域名）
 - 文档2：EdgeOne Makers - WorkBuddy 智能体搭建手册（七步流程）
@@ -15,6 +15,7 @@
 | 工具 | 作用 | 是否虚构数据 |
 | --- | --- | --- |
 | `generate_resume` | 结构化候选人信息 → 一份 Markdown 简历 | 否，只用你提供的真实信息 |
+| `polish_resume` | 用户上传的已有简历 → 逐段改写润色后的定稿 | 否，后端会比对原文与定稿的数字，编造会被打回 |
 | `match_jobs` | 简历 × 真实招聘信息 → 匹配度打分 + Top 推荐 + 缺口分析 | 否，岗位必须来自真实数据 |
 | `save_jobs` | 真实招聘信息写入 `jobs.json`（按 title+company 去重） | 否，由你提供 |
 | `export_resume_pdf` | 简历 Markdown → 中文排版 PDF，推给前端一键下载 | 否，只渲染已有内容 |
@@ -29,7 +30,7 @@
 
 ---
 
-## 二、四个工程细节（和原版 starter 的差异）
+## 二、五个工程细节（和原版 starter 的差异）
 
 ### 1. 简历正文由后端直接推给前端
 模型经常只回一句「简历已生成」，用户根本看不到简历。所以 `agents/chat/index.py` 在收到
@@ -65,11 +66,36 @@
 ### 4. 本地运行不需要 EdgeOne 账号
 
 `dev/local_server.py` 实现了平台运行时的同一套路由（`/chat` `/stop` `/history` `/conversations`
-`/delete-conversation` `/export-pdf`），并**复用 `agents/chat/index.py` 里同一个 agent 和同一套 SSE 逻辑**，
+`/delete-conversation` `/export-pdf` `/parse-resume`），并**复用 `agents/chat/index.py` 里同一个 agent 和同一套 SSE 逻辑**，
 所以本地看到的效果和线上一致。
 
 > 它跑了一个**常驻事件循环**（独立线程）。不能在每个请求里 `asyncio.run()`——aiosqlite / httpx 的
 > 连接会绑定到首次使用的循环，循环一关，下一轮就报 `RuntimeError: Event loop is closed`。
+
+### 5. 上传简历润色：文本抽取 + 事实校验
+
+用户可以把已有的 PDF / DOCX / TXT 简历拖进输入框，Agent 在原稿上改写，而不是重写一份新的。
+
+链路：
+
+1. 前端 `FileReader` 读成 Base64 → `POST /parse-resume`；
+2. `agents/resume_parser.py` 抽文本：PDF 用 `pypdf`，DOCX 用标准库 `zipfile` 直接读
+   `word/document.xml`（不引入 lxml），TXT 按 utf-8 → gb18030 → utf-16 依次尝试解码；
+   顺手清掉 PDF 里常见的控制字符与「— 1 —」页码噪声；
+3. 前端把「用户要求 + 原文」包成一条消息发给模型，原文包在 `<<<RESUME_SOURCE>>>` 标记里；
+   界面上只显示一行「📎 文件名 · N 字（已折叠）」，不会把几千字铺在气泡里；
+4. 模型改写完调用 `polish_resume(resume_markdown)` 提交定稿，工具把正文放进进程内缓存、只回 `rid`，
+   `chat/index.py` 按 `rid` 取回原文并作为 `text_delta` 下发，避免模型二次复述时摘要或截断。
+
+**事实校验（重点）**：实测发现模型会「顺手」补上原文没有的量化成果（如「提升 30%」「覆盖 12 家门店」），
+光靠提示词压不住。所以 `polish_resume` 会拿 `ContextVar` 里存的原文与定稿比对数字集合：
+
+- 定稿出现原文没有的数字 → 第一次直接拒绝（`ok: false` + 列出具体数字），让模型改写后重新提交；
+- 第二次仍出现 → 放行，但要求模型在回复里标注这些数字需要用户确认（避免反复重试把轮次耗光）。
+
+> 用 `ContextVar` 而不是模块级全局变量：同一进程会并发处理多个会话，全局变量会把 A 用户的简历
+> 拿去校验 B 用户的润色结果。另外，捕获原文的代码放在 `_event_stream` 而不是 `handler`，
+> 因为本地运行器直接调用 `_event_stream`，写在 `handler` 里会让本地校验静默失效。
 
 ---
 
@@ -128,9 +154,11 @@ AI_GATEWAY_MODEL=qwen-plus                                              # 需支
 
 ```text
 ├── agents/chat/index.py      # Agent 指令 + SSE 流（含简历注入、PDF 下发）
-├── agents/_tools.py          # 四个真实工具
+├── agents/_tools.py          # 五个真实工具
 ├── agents/resume_pdf.py      # Markdown 简历 → 中文 PDF（reportlab + STSong-Light）
+├── agents/resume_parser.py   # PDF / DOCX / TXT → 纯文本（pypdf + 标准库 zipfile）
 ├── agents/export-pdf/        # POST /export-pdf，无状态转换
+├── agents/parse-resume/      # POST /parse-resume，上传简历解析
 ├── agents/chat/stop.py       # 中断生成
 ├── cloud-functions/          # history / conversations / delete / clear
 ├── dev/local_server.py       # 免账号本地运行器
@@ -142,13 +170,16 @@ AI_GATEWAY_MODEL=qwen-plus                                              # 需支
 
 相对官方 starter 的改动：
 
-- `agents/_tools.py` —— 重写：四个玩具工具 → 简历 / 匹配 / 入库 / PDF 导出
+- `agents/_tools.py` —— 重写：四个玩具工具 → 简历 / 润色 / 匹配 / 入库 / PDF 导出，含数字事实校验
 - `agents/chat/index.py` —— 指令重写 + `tool_output` 简历注入 + `pdf_ready` 下发 + 丢弃空 delta
 - `agents/resume_pdf.py`、`agents/export-pdf/` —— 新增，PDF 渲染与下载
+- `agents/resume_parser.py`、`agents/parse-resume/` —— 新增，上传简历的文本抽取
 - `src/types.ts`、`src/api.ts`、`src/lib/downloadPdf.ts`、`src/components/ChatBubble.tsx` ——
   新增 `pdf_ready` / `resume_ready` 事件处理与「下载 PDF」按钮
+- `src/components/ChatInput.tsx`、`src/lib/resumeAttachment.ts` —— 新增附件按钮 / 拖拽上传 /
+  附件卡片 / 历史消息里的原文折叠
 - `src/App.tsx`、`src/i18n/{zh,en}.ts`、`src/components/CodeViewer.tsx` ——
   指示灯 / 文案 / 代码示例全部换成简历与岗位语义
 - `dev/local_server.py`、`启动本地版.bat` —— 新增，仅本地使用，不参与云端构建
 - `jobs.json` —— 40 条真实岗位数据
-- `requirements.txt` —— 新增 `reportlab`（云端构建会装）
+- `requirements.txt` —— 新增 `reportlab`、`pypdf`（云端构建会装）
