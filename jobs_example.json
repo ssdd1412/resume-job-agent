@@ -1,0 +1,29 @@
+[
+  {
+    "title": "后端开发工程师（示例占位，请替换为真实招聘信息）",
+    "company": "示例公司A",
+    "location": "深圳",
+    "salary": "15-25K",
+    "requirements": ["Python", "MySQL", "FastAPI", "Redis"],
+    "description": "负责交易系统后端服务开发与性能优化。",
+    "url": "https://example.com/job/1"
+  },
+  {
+    "title": "数据分析师（示例占位，请替换为真实招聘信息）",
+    "company": "示例公司B",
+    "location": "广州",
+    "salary": "12-20K",
+    "requirements": ["SQL", "Python", "Excel", "数据可视化", "Tableau"],
+    "description": "搭建业务指标体系，输出经营分析报告。",
+    "url": "https://example.com/job/2"
+  },
+  {
+    "title": "前端开发工程师（示例占位，请替换为真实招聘信息）",
+    "company": "示例公司C",
+    "location": "深圳",
+    "salary": "14-22K",
+    "requirements": ["JavaScript", "React", "TypeScript", "Vue"],
+    "description": "负责中后台管理系统前端开发。",
+    "url": "https://example.com/job/3"
+  }
+]
