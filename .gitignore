@@ -46,3 +46,8 @@ AGENTS.md
 .local_conversations.db-shm
 .local_conversations.db-wal
 dev/_local.log
+
+# Tencent Cloud EdgeOne
+.env
+.edgeone/*
+.tef_dist/*

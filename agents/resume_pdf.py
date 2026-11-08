@@ -360,6 +360,9 @@ def export_payload(markdown: str, file_name: str = "") -> dict:
         return {"ok": False, "error": f"PDF 渲染失败：{e}"}
 
     name = (file_name or "").strip()
+    # 调用方可能已经把后缀写进文件名了，避免出现 "xxx.pdf.pdf"
+    if name.lower().endswith(".pdf"):
+        name = name[:-4].strip()
     return {
         "ok": True,
         "filename": f"{name}.pdf" if name else suggest_filename(markdown),
