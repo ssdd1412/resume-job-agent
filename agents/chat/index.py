@@ -34,13 +34,27 @@ logger = create_logger("chat")
 
 
 # ========== LLM Model ==========
-llm_client = AsyncOpenAI(
-    api_key=os.getenv("AI_GATEWAY_API_KEY"),
-    base_url=os.getenv("AI_GATEWAY_BASE_URL"),
+# 变量名说明：
+# AI_GATEWAY_* 是 EdgeOne Makers 的保留前缀，平台可能用自己的网关凭证覆盖它，
+# 那样会出现「平台的 key + 百炼的 base_url」→ 401 Invalid API key。
+# 因此优先读 DASHSCOPE_*（自定义命名，平台不干预），读不到再回退到 AI_GATEWAY_*。
+API_KEY = os.getenv("DASHSCOPE_API_KEY") or os.getenv("AI_GATEWAY_API_KEY")
+BASE_URL = os.getenv("DASHSCOPE_BASE_URL") or os.getenv("AI_GATEWAY_BASE_URL")
+MODEL_NAME = (
+    os.getenv("DASHSCOPE_MODEL")
+    or os.getenv("AI_GATEWAY_MODEL")
+    or "@makers/deepseek-v4-flash"
 )
 
+logger.log(
+    f"llm config: model={MODEL_NAME} base={BASE_URL} "
+    f"key_len={len(API_KEY or '')} key_src={'DASHSCOPE' if os.getenv('DASHSCOPE_API_KEY') else 'AI_GATEWAY'}"
+)
+
+llm_client = AsyncOpenAI(api_key=API_KEY, base_url=BASE_URL)
+
 llm_model = OpenAIChatCompletionsModel(
-    model=os.getenv("AI_GATEWAY_MODEL", "@makers/deepseek-v4-flash"),
+    model=MODEL_NAME,
     openai_client=llm_client,
 )
 
