@@ -62,7 +62,7 @@ const en = {
 
   // Missing-info dialog
   "followup.title": "Fill these in for a stronger resume",
-  "followup.hint": "Your resume is missing the details below. Fill them in and I'll update it automatically — or just skip.",
+  "followup.hint": "Your resume is missing the details below (including projects and skills — you can add them now even if they're absent). Fill them in and I'll update the resume and create the missing sections automatically — or just skip.",
   "followup.placeholder": "Your answer (leave blank to skip)",
   "followup.skip": "Skip for now",
   "followup.submit": "Submit & update resume",

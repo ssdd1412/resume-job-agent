@@ -59,7 +59,7 @@ export default function FollowUpDialog({ questions, busy, onSkip, onSubmit }: Pr
               <span className={styles.question}>{i + 1}. {q}</span>
               <textarea
                 className={styles.input}
-                rows={2}
+                rows={3}
                 value={answers[i] || ''}
                 disabled={busy}
                 placeholder={t('followup.placeholder')}

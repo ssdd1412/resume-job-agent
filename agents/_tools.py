@@ -53,11 +53,15 @@ def get_followups() -> list:
 
 
 def _derive_followups(p: dict) -> list:
-    """从结构化 profile 的缺失字段推导待补充问题（最多 6 条）。"""
+    """从结构化 profile 的缺失字段推导待补充问题（最多 12 条）。
+
+    项目经历、专业技能这类板块即使完全没有，也要问一句让用户补，
+    不能因为字段为空就悄悄跳过——用户明确要求「没有也给我补」。
+    """
     questions: list[str] = []
 
     def add(q: str) -> None:
-        if q not in questions and len(questions) < 6:
+        if q not in questions and len(questions) < 12:
             questions.append(q)
 
     def filled(v) -> bool:
@@ -78,8 +82,36 @@ def _derive_followups(p: dict) -> list:
     ):
         add("你目前所在的城市，以及想投递的城市是哪里？")
 
+    if not filled(p.get("target_role")) and not filled(p.get("targetRole")):
+        add("你的求职意向是什么岗位、什么方向？")
+
     if not filled(p.get("summary")):
         add("请用 2~3 句话介绍你自己（优势、方向、经验年限）。")
+
+    # 项目经历放在教育/实习之前，确保即使问句很多也能优先问到（用户点名要补这项）
+    proj = [pr for pr in (p.get("projects") or []) if isinstance(pr, dict)]
+    proj = [pr for pr in proj if filled(pr.get("name"))]
+    if not proj:
+        add("你做过哪些项目？请至少写一个：项目名称、你的角色、具体做了什么（有数据更好）。")
+    else:
+        pr = proj[0]
+        pname = str(pr.get("name") or "这个项目").strip()
+        bullets = pr.get("bullets") or []
+        if not filled(pr.get("role")):
+            add(f"「{pname}」你在里面承担什么角色？")
+        if not bullets:
+            add(f"「{pname}」你具体做了什么？请写 1~3 条主要工作。")
+        elif not re.search(r"\d", " ".join(str(b) for b in bullets)):
+            # 描述里已经带数字就算已量化，避免补齐后下一轮还问同一句
+            add(f"「{pname}」有没有可以量化的成果（数据指标、规模、提升幅度）？")
+
+    exp = [x for x in (p.get("experience") or []) if isinstance(x, dict)]
+    if not exp or not any(filled(x.get("company")) for x in exp):
+        add("你有过哪些实习或工作经历？请写公司名、岗位和起止时间。")
+    else:
+        x = next((x for x in exp if filled(x.get("company"))), {})
+        if not filled(x.get("start")) or not filled(x.get("end")):
+            add("你这段实习/工作的起止时间是什么时候？")
 
     edu = [e for e in (p.get("education") or []) if isinstance(e, dict)]
     if not edu or not any(filled(e.get("school")) for e in edu):
@@ -91,23 +123,11 @@ def _derive_followups(p: dict) -> list:
         if not filled(e.get("start")) or not filled(e.get("end")):
             add("你的入学和毕业时间分别是什么时候？")
 
-    exp = [x for x in (p.get("experience") or []) if isinstance(x, dict)]
-    if not exp or not any(filled(x.get("company")) for x in exp):
-        add("你有过哪些实习或工作经历？请写公司名和岗位。")
-    else:
-        x = next((x for x in exp if filled(x.get("company"))), {})
-        if not filled(x.get("start")) or not filled(x.get("end")):
-            add("你这段实习/工作的起止时间是什么时候？")
-
-    proj = [pr for pr in (p.get("projects") or []) if isinstance(pr, dict)]
-    if proj:
-        pr = proj[0]
-        pname = str(pr.get("name") or "这个项目").strip()
-        bullets = pr.get("bullets") or []
-        if not bullets:
-            add(f"「{pname}」你具体做了什么？承担什么角色？")
-        else:
-            add(f"「{pname}」有没有可以量化的成果（数据指标、规模、提升幅度）？")
+    # 技能与证书合并成一条，避免弹窗过长
+    skills = p.get("skills") or []
+    certs = p.get("certifications") or []
+    if not skills or not certs:
+        add("你掌握哪些技能/工具？有没有相关证书或获奖？（有就写，没有可留空）")
 
     return questions
 

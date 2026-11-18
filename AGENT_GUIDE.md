@@ -165,10 +165,12 @@
 
 简历缺项不再写在正文里，改为弹窗逐条收集：
 
-- `generate_resume` 从 `profile_json` 的缺失字段直接算问题（手机号、邮箱、院校、专业、
-  起止时间、项目量化成果等，最多 6 条），存进模块级变量；`chat/index.py` 下发 `resume_ready`
-  时一并推 `followups_ready`。**不依赖模型多调工具**——实测 qwen-plus 经常把「待补充」
-  写进正文而不调 `report_missing_info`，所以必须有后端兜底。
+- `generate_resume` 从 `profile_json` 的缺失字段直接算问题（姓名、手机、邮箱、城市、求职意向、
+  简介、**项目经历**、实习/工作、教育、技能证书，最多 12 条），存进模块级变量；
+  `chat/index.py` 下发 `resume_ready` 时一并推 `followups_ready`。**不依赖模型多调工具**——
+  实测 qwen-plus 经常把「待补充」写进正文而不调 `report_missing_info`，所以必须有后端兜底。
+- **空板块也问**：项目经历、专业技能/证书完全缺失时照样列进弹窗让用户补，
+  不能因为字段为空就跳过；项目描述里已经带数字视为已量化，不再追问，避免反复弹同一句。
 - 模型主动调 `report_missing_info(questions_json)` 时也能下发；两路用 `followups_sent` 去重。
 - 前端 `FollowUpDialog` 弹窗收集答案，提交后自动拼成一条消息重新生成简历；
   已补的项在新一轮 profile 里不再缺失，所以弹窗会逐轮收敛。「暂时跳过」直接关闭。

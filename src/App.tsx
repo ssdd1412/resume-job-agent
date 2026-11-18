@@ -497,7 +497,9 @@ function AppInner() {
     setFollowups(null);
     const text =
       '我补充以下信息，请把它们填进刚才那份简历，重新生成一份完整定稿（其余真实经历和已有内容保持不变）：\n'
-      + answers.map((a, i) => `${i + 1}. ${a}`).join('\n');
+      + answers.map((a, i) => `${i + 1}. ${a}`).join('\n')
+      + '\n注意：原来简历里没有的板块（例如项目经历、专业技能、证书荣誉），'
+      + '请按我补充的内容新建对应板块写进去，不要留「待补充」占位，也不要漏掉。';
     void handleSend(text);
   }, [handleSend]);
 
