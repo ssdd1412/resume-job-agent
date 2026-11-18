@@ -64,7 +64,7 @@ const zh = {
   "followup.title": "补齐这几项，简历更完整",
   "followup.hint": "下面这些信息简历里还没有（包括项目经历、专业技能等，没有也可以现在补）。填完我会自动更新简历并新建对应板块；不想填可以直接跳过。",
   "followup.placeholder": "在这里填写（可留空）",
-  "followup.skip": "暂时跳过",
+  "followup.skip": "跳过，用现有信息生成",
   "followup.submit": "提交并更新简历",
   "followup.sending": "正在更新…",
   "followup.count": "共 {n} 项待补充",

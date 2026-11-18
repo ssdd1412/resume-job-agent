@@ -693,7 +693,12 @@ function AppInner() {
         <FollowUpDialog
           questions={followups}
           busy={loading}
-          onSkip={() => setFollowups(null)}
+          onSkip={() => {
+            setFollowups(null);
+            // 新流程下首轮不生成简历：跳过也要触发一次生成，
+            // 否则用户关掉弹窗后什么也拿不到。这条消息会被后端识别为补齐轮，不再弹窗。
+            void handleSend('不用补充了，请用现有信息直接生成简历终版。');
+          }}
           onSubmit={handleFollowupSubmit}
         />
       )}

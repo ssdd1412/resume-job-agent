@@ -64,7 +64,7 @@ const en = {
   "followup.title": "Fill these in for a stronger resume",
   "followup.hint": "Your resume is missing the details below (including projects and skills — you can add them now even if they're absent). Fill them in and I'll update the resume and create the missing sections automatically — or just skip.",
   "followup.placeholder": "Your answer (leave blank to skip)",
-  "followup.skip": "Skip for now",
+  "followup.skip": "Skip & generate with what I have",
   "followup.submit": "Submit & update resume",
   "followup.sending": "Updating…",
   "followup.count": "{n} item(s) to fill in",
