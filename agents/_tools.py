@@ -34,13 +34,25 @@ _LAST_RESUME: contextvars.ContextVar[str] = contextvars.ContextVar(
 
 # ========== 工具函数 ==========
 def _load_jobs() -> list:
-    """读取 jobs.json 中的真实招聘信息。"""
+    """读取真实招聘信息：优先 jobs.json，云端读不到时回退到内嵌模块。"""
     try:
         if os.path.exists(_JOBS_PATH):
             with open(_JOBS_PATH, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if isinstance(data, list):
                     return data
+    except Exception:
+        pass
+    # EdgeOne 云函数只打包 agents/ 下的 Python 模块，根目录 jobs.json 不会随行。
+    # 用内嵌副本兜底，避免线上匹配永远拿到空库。
+    try:
+        try:
+            from .jobs_data import JOBS_JSON
+        except ImportError:
+            from jobs_data import JOBS_JSON  # 本地单独加载 _tools.py 时
+        data = json.loads(JOBS_JSON)
+        if isinstance(data, list):
+            return data
     except Exception:
         pass
     return []

@@ -152,6 +152,15 @@
 `save_jobs` 在云函数里写不进磁盘（无持久存储，实例重启即丢），所以**扩充岗位库的唯一可靠方式**
 是改仓库里的 `jobs.json` 再部署；前端粘贴 JD 走的是单轮 `jobs_json` 参数，不落盘。
 
+改完 `jobs.json` 必须再跑一次同步，否则线上仍读旧数据：
+
+```bash
+.venv/Scripts/python.exe dev/sync_jobs_data.py
+```
+
+原因：EdgeOne 云函数只打包 `agents/` 下的 Python 模块，根目录的 `jobs.json` 不会随行。
+`agents/jobs_data.py` 是内嵌副本，`_load_jobs()` 在读不到文件时回退到它。
+
 ---
 
 ## 三、本地运行
@@ -219,6 +228,7 @@ AI_GATEWAY_MODEL=qwen-plus                                              # 需支
 ├── dev/local_server.py       # 免账号本地运行器
 ├── 启动本地版.bat            # Windows 一键启动
 ├── jobs.json                 # 55 条真实岗位（带 url / fetched_at）
+├── agents/jobs_data.py       # jobs.json 的内嵌副本（云函数回退读取）
 ├── src/                      # React 前端
 └── edgeone.json              # framework=openai-agents-sdk
 ```
@@ -239,4 +249,5 @@ AI_GATEWAY_MODEL=qwen-plus                                              # 需支
   指示灯 / 文案 / 代码示例全部换成简历与岗位语义
 - `dev/local_server.py`、`启动本地版.bat` —— 新增，仅本地使用，不参与云端构建
 - `jobs.json` —— 55 条真实岗位数据，含 2027 届校招与深圳/广州实习岗，链接逐条探活
+- `dev/sync_jobs_data.py` —— 改完 jobs.json 后同步内嵌副本
 - `requirements.txt` —— 新增 `reportlab`、`pypdf`（云端构建会装）
