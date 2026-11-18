@@ -224,7 +224,9 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 return self._json(500, {"ok": False, "error": f"PDF 组件加载失败：{e}"})
             result = export_payload(
-                body.get("markdown") or "", (body.get("file_name") or "").strip()
+                body.get("markdown") or "",
+                (body.get("file_name") or "").strip(),
+                (body.get("template") or "").strip(),
             )
             return self._json(200 if result.get("ok") else 400, result)
 

@@ -129,6 +129,11 @@ function AppInner() {
   const eoUuidRef = useRef<string>(getOrCreateEoUuid());
   const initDoneRef = useRef(false);
   const snapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * 用户发起新消息时自增。/history 的响应比 /chat 慢，如果期间用户已经发了消息，
+   * 迟到的历史列表会把刚流式写入的气泡整个覆盖掉（表现为对话框突然变空）。
+   */
+  const messagesVersionRef = useRef(0);
 
   // Keep conversationIdRef in sync with the activeConversationId state.
   useEffect(() => {
@@ -165,6 +170,7 @@ function AppInner() {
 
   /** Load full message list for a conversation: snapshot first, then /history reconciliation. */
   const loadConversation = useCallback(async (convId: string) => {
+    const versionAtStart = messagesVersionRef.current;
     setHistoryLoading(true);
     let restoredFromSnapshot = false;
     let snapshotMessageCount = 0;
@@ -172,13 +178,21 @@ function AppInner() {
     try {
       const snapshot = await loadSnapshot(convId).catch(() => [] as Message[]);
       snapshotMessageCount = snapshot.length;
-      if (snapshot.length > 0) {
+      if (snapshot.length > 0 && messagesVersionRef.current === versionAtStart) {
         restoredFromSnapshot = true;
         setMessages(snapshot);
         setHistoryLoading(false);
       }
 
       const history = await fetchConversationHistory(convId, eoUuidRef.current);
+
+      // 这期间用户已经发了新消息（甚至已在流式输出），历史列表就别再回灌了，
+      // 否则会把刚出现的气泡覆盖成空列表。
+      if (messagesVersionRef.current !== versionAtStart) {
+        initDoneRef.current = true;
+        return;
+      }
+
       if (history.length > 0) {
         if (!restoredFromSnapshot || history.length > snapshotMessageCount) {
           setMessages(history);
@@ -317,6 +331,7 @@ function AppInner() {
     };
 
     setMessages(prev => [...prev, userMsg, botMsg]);
+    messagesVersionRef.current += 1;
     setLoading(true);
 
     /**
@@ -365,11 +380,17 @@ function AppInner() {
         updateBotMessage(content => content + delta);
       },
 
-      onResumeReady() {
+      onResumeReady(resumeMarkdown) {
         // 后端确认这一屏是简历 → 气泡底部出现「下载 PDF」入口
         setMessages(prev =>
           prev.map(m =>
-            m.id === botMsgIdRef.current ? { ...m, isResume: true } : m
+            m.id === botMsgIdRef.current
+              ? {
+                  ...m,
+                  isResume: true,
+                  resumeMarkdown: resumeMarkdown || m.resumeMarkdown,
+                }
+              : m
           )
         );
       },
@@ -379,6 +400,15 @@ function AppInner() {
         setMessages(prev =>
           prev.map(m =>
             m.id === botMsgIdRef.current ? { ...m, isResume: true, pdf } : m
+          )
+        );
+      },
+
+      onJobsReady(jobs, total) {
+        // 岗位匹配结果 → 气泡下方渲染岗位卡片（原链接 + 平台实时搜索）
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === botMsgIdRef.current ? { ...m, jobs, jobsTotal: total } : m
           )
         );
       },

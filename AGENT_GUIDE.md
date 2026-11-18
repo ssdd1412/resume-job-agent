@@ -18,7 +18,7 @@
 | `polish_resume` | 用户上传的已有简历 → 逐段改写润色后的定稿 | 否，后端会比对原文与定稿的数字，编造会被打回 |
 | `match_jobs` | 简历 × 真实招聘信息 → 匹配度打分 + Top 推荐 + 缺口分析 | 否，岗位必须来自真实数据 |
 | `save_jobs` | 真实招聘信息写入 `jobs.json`（按 title+company 去重） | 否，由你提供 |
-| `export_resume_pdf` | 简历 Markdown → 中文排版 PDF，推给前端一键下载 | 否，只渲染已有内容 |
+| `export_resume_pdf` | 简历 Markdown → 中文排版 PDF（5 套模板可选），推给前端一键下载 | 否，只渲染已有内容 |
 
 匹配逻辑（透明、可解释）：
 1. 简历与岗位要求都切成词元（英文按词、中文按二元组）；
@@ -30,7 +30,7 @@
 
 ---
 
-## 二、五个工程细节（和原版 starter 的差异）
+## 二、六个工程细节（和原版 starter 的差异）
 
 ### 1. 简历正文由后端直接推给前端
 模型经常只回一句「简历已生成」，用户根本看不到简历。所以 `agents/chat/index.py` 在收到
@@ -99,6 +99,61 @@
 
 ---
 
+### 6. 五套简历模板（同一份内容，五种排版）
+
+`agents/resume_pdf.py` 顶部的 `TEMPLATES` 是唯一事实来源，模板 id 通过 `POST /export-pdf`
+的 `template` 字段传入，未知 id 自动回退 `classic`：
+
+| id | 名称 | 版式 | 做法 |
+| --- | --- | --- | --- |
+| `classic` | 经典蓝 | 单栏 | 蓝色标题 + 下划线，最通用的投递样式 |
+| `minimal` | 极简黑白 | 单栏 | 左对齐大标题、细黑线、无彩色，留白多 |
+| `sidebar` | 侧栏双栏 | 双栏 | 左侧深色栏放联系方式与技能，右侧放经历 |
+| `academic` | 学术严谨 | 单栏 | 居中标题 + 上下细线，偏正式/升学 |
+| `campus` | 清新校园 | 单栏 | 页头浅绿横幅 + 绿色标题色块 |
+
+实现要点：
+
+- **模板只改排版，不动内容**。换模板时前端传的是 `resume_ready` 事件带下来的简历原文，
+  而不是整条消息内容——否则模型在简历后面补的「改了什么/建议补充」会被一起排进 PDF。
+- **双栏用两个 `Frame`**（侧栏 + 主栏）加 `FrameBreak()` 实现；`NextPageTemplate('main_only')`
+  让第 2 页起改用整页宽的单栏模板，避免续页正文挤在右侧、左边留一片空白。
+  侧栏放什么由章节标题关键词决定（技能/证书/语言/兴趣…），含表格的章节一律留在主栏；
+  如果所有章节都被判进侧栏导致主栏为空，则全部退回主栏。
+- **空白页**：内容刚好排满时，末尾的 `Spacer` 会把内容挤出一张只有页码的空白页。
+  `_trim_tail()` 在 build 前去掉结尾的 `Spacer`/`HRFlowable`。
+- 前端 `src/lib/resumeTemplates.ts` 保存模板清单与 localStorage 记忆，
+  `src/components/TemplateThumb.tsx` 用纯 SVG 画 5 张缩略图（页头布局、有没有侧栏、标题是
+  下划线还是色块一眼能看出来），点卡片即按新样式重排并下载。
+
+---
+
+### 7. 岗位匹配卡片 + 平台实时搜索
+
+`jobs.json` 是招聘库快照（55 条，每条带 `url` 与 `fetched_at`/`verified_at`）。快照有两个天然缺陷：
+岗位会下架、抓到的 JD 会过期。所以匹配结果不只是一份文字清单：
+
+- `match_jobs` 给每条结果附 `search_urls`（BOSS直聘 / 智联招聘 / 猎聘 的实时搜索链接），
+  关键词会先过 `_search_keyword()` 清洗——「数据分析（2027届校招）」要变成「数据分析」才能搜到东西，
+  城市则用内置城市码映射（未知城市不带 city 参数，避免定位到错误城市）。
+- `agents/chat/index.py` 拦截 `match_jobs` 的 `tool_output`，下发 `jobs_ready` 事件（最多 8 条），
+  前端 `ChatBubble` 渲染成卡片：岗位名、匹配度进度条、公司·地点·薪资、缺口、原岗位 + 三个平台按钮。
+- 指令里明确要求模型**不要复述卡片内容**（不列岗位表、不贴 URL、不念薪资和百分比），
+  只讲「先投哪 1~2 个、为什么、共同缺口」。
+
+两个容易踩的坑：
+
+- **匹配度全 0**：模型有时把空串或只把姓名传给 `resume_text`，`_tokenize` 取不到任何词元 → 所有岗位 0 分。
+  现在用 `_LAST_RESUME` ContextVar 兜底（`generate_resume` 写入），并且 `< 10` 字符时直接返回 `no_resume` 错误
+  要求重传，而不是给出一份全 0 的结果。返回值里的 `resume_chars` 就是为排查这件事留的。
+- **批次词进 requirements**：「2027届」「秋招」是招聘批次不是技能，留在 `requirements` 里会显示成
+  「缺口：2027届」，误导用户。入库时要么去掉，要么只写进 `description`。
+
+`save_jobs` 在云函数里写不进磁盘（无持久存储，实例重启即丢），所以**扩充岗位库的唯一可靠方式**
+是改仓库里的 `jobs.json` 再部署；前端粘贴 JD 走的是单轮 `jobs_json` 参数，不落盘。
+
+---
+
 ## 三、本地运行
 
 前置：Node ≥ 18、Python ≥ 3.10。
@@ -155,7 +210,7 @@ AI_GATEWAY_MODEL=qwen-plus                                              # 需支
 ```text
 ├── agents/chat/index.py      # Agent 指令 + SSE 流（含简历注入、PDF 下发）
 ├── agents/_tools.py          # 五个真实工具
-├── agents/resume_pdf.py      # Markdown 简历 → 中文 PDF（reportlab + STSong-Light）
+├── agents/resume_pdf.py      # Markdown 简历 → 中文 PDF（5 套模板，reportlab + STSong-Light）
 ├── agents/resume_parser.py   # PDF / DOCX / TXT → 纯文本（pypdf + 标准库 zipfile）
 ├── agents/export-pdf/        # POST /export-pdf，无状态转换
 ├── agents/parse-resume/      # POST /parse-resume，上传简历解析
@@ -163,7 +218,7 @@ AI_GATEWAY_MODEL=qwen-plus                                              # 需支
 ├── cloud-functions/          # history / conversations / delete / clear
 ├── dev/local_server.py       # 免账号本地运行器
 ├── 启动本地版.bat            # Windows 一键启动
-├── jobs.json                 # 40 条真实岗位
+├── jobs.json                 # 55 条真实岗位（带 url / fetched_at）
 ├── src/                      # React 前端
 └── edgeone.json              # framework=openai-agents-sdk
 ```
@@ -172,14 +227,16 @@ AI_GATEWAY_MODEL=qwen-plus                                              # 需支
 
 - `agents/_tools.py` —— 重写：四个玩具工具 → 简历 / 润色 / 匹配 / 入库 / PDF 导出，含数字事实校验
 - `agents/chat/index.py` —— 指令重写 + `tool_output` 简历注入 + `pdf_ready` 下发 + 丢弃空 delta
-- `agents/resume_pdf.py`、`agents/export-pdf/` —— 新增，PDF 渲染与下载
+- `agents/resume_pdf.py`、`agents/export-pdf/` —— 新增，PDF 渲染（5 套模板）与下载
 - `agents/resume_parser.py`、`agents/parse-resume/` —— 新增，上传简历的文本抽取
+- `src/lib/resumeTemplates.ts`、`src/components/TemplateThumb.tsx` —— 新增，模板清单 + SVG 缩略图
 - `src/types.ts`、`src/api.ts`、`src/lib/downloadPdf.ts`、`src/components/ChatBubble.tsx` ——
-  新增 `pdf_ready` / `resume_ready` 事件处理与「下载 PDF」按钮
+  新增 `pdf_ready` / `resume_ready` 事件处理、「下载 PDF」按钮与模板挑选面板
 - `src/components/ChatInput.tsx`、`src/lib/resumeAttachment.ts` —— 新增附件按钮 / 拖拽上传 /
   附件卡片 / 历史消息里的原文折叠
+- `jobs_ready` 事件 + `JobBoard` 卡片：岗位匹配结果结构化下发，每张卡带原岗位与三家平台实时搜索
 - `src/App.tsx`、`src/i18n/{zh,en}.ts`、`src/components/CodeViewer.tsx` ——
   指示灯 / 文案 / 代码示例全部换成简历与岗位语义
 - `dev/local_server.py`、`启动本地版.bat` —— 新增，仅本地使用，不参与云端构建
-- `jobs.json` —— 40 条真实岗位数据
+- `jobs.json` —— 55 条真实岗位数据，含 2027 届校招与深圳/广州实习岗，链接逐条探活
 - `requirements.txt` —— 新增 `reportlab`、`pypdf`（云端构建会装）

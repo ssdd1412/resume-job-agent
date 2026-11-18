@@ -15,6 +15,7 @@ import contextvars
 import json
 import os
 import re
+import urllib.parse
 import uuid
 from typing import Annotated
 
@@ -22,6 +23,13 @@ from agents import function_tool
 
 # jobs.json 位于项目根目录（agents/_tools.py -> ../.. -> 项目根）
 _JOBS_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "jobs.json")
+
+# 本请求内最近一次 generate_resume 产出的简历正文。
+# 模型有时会忘记把简历原文传给 match_jobs（传空串或只传姓名），匹配度就会全部算成 0，
+# 这种「静默丢分」比报错更难发现。用 ContextVar 兜底，同时不跨请求串味。
+_LAST_RESUME: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "last_resume", default=""
+)
 
 
 # ========== 工具函数 ==========
@@ -59,6 +67,79 @@ def _merge_jobs(incoming: list) -> int:
             added += 1
     _save_jobs(existing)
     return added
+
+
+# ========== 实时搜索入口 ==========
+# jobs.json 只是抓取时的快照：招聘站下架岗位后，原链接会变成「职位已下线」页。
+# 所以每条匹配结果额外附一组平台实时搜索链接——点开看到的就是当下在招的同类岗位，
+# 这条路径不依赖爬虫，也不会过期。
+_BOSS_CITY = {
+    "北京": "101010100", "上海": "101020100", "广州": "101280100",
+    "深圳": "101280600", "杭州": "101210100", "成都": "101270100",
+    "武汉": "101200100", "南京": "101190100", "西安": "101110100",
+    "苏州": "101190400", "长沙": "101250100", "重庆": "101040100",
+    "天津": "101030100", "郑州": "101180100", "合肥": "101220100",
+}
+# 智联的 jl 城市码
+_ZHAOPIN_CITY = {
+    "北京": "530", "上海": "538", "广州": "763", "深圳": "765",
+    "杭州": "653", "成都": "801", "武汉": "736", "南京": "635", "西安": "854",
+}
+
+
+def _q(text: str) -> str:
+    return urllib.parse.quote(str(text or "").strip())
+
+
+# 岗位名里常带「（2027届校招）」「(深圳)」「秋招」这类批次/地点修饰，
+# 直接拿去平台搜索会搜不到结果，得先剥掉，只留真正的职位词。
+_TITLE_NOISE = re.compile(
+    r"20\d{2}\s*届?|\d{2}\s*届|秋招|春招|校招|社招|急招|急聘|长期有效|可远程"
+)
+
+
+def _search_keyword(title: str) -> str:
+    """把岗位标题清洗成平台能搜到东西的关键词。"""
+    raw = str(title or "").strip()
+    if not raw:
+        return ""
+    # 先剥括号内容（中文/英文/方括号），再剥批次词
+    kw = re.sub(r"[（(【\[][^)）】\]]*[)）】\]]", " ", raw)
+    kw = _TITLE_NOISE.sub(" ", kw)
+    kw = re.sub(r"\s+", " ", kw).strip(" -·/、")
+    # 清洗后太短（例如原标题就叫「校招」）就退回原标题，别搜成空
+    return kw if len(kw) >= 2 else raw
+
+
+def search_links(title: str, location: str = "") -> list:
+    """按岗位名 + 城市生成三家平台的实时搜索链接。
+
+    城市码只覆盖常见城市；缺省时不带城市参数，让平台按 IP 定位，避免给出错误城市。
+    """
+    kw = _q(_search_keyword(title))
+    if not kw:
+        return []
+    loc = str(location or "").strip()
+    links = []
+
+    boss_code = _BOSS_CITY.get(loc)
+    links.append({
+        "site": "BOSS直聘",
+        "url": "https://www.zhipin.com/web/geek/jobs?query=" + kw
+        + (f"&city={boss_code}" if boss_code else ""),
+    })
+
+    zp_code = _ZHAOPIN_CITY.get(loc)
+    links.append({
+        "site": "智联招聘",
+        "url": "https://sou.zhaopin.com/?kw=" + kw + (f"&jl={zp_code}" if zp_code else ""),
+    })
+
+    links.append({
+        "site": "猎聘",
+        "url": "https://www.liepin.com/zhaopin/?key=" + kw,
+    })
+    return links
 
 
 def _tokenize(text: str) -> set:
@@ -187,7 +268,9 @@ def generate_resume(
     lines.append("---")
     lines.append("> 本简历依据你提供的信息自动生成，投递前请逐条核对经历、时间与数字是否属实。")
 
-    return "\n".join(lines).strip() + "\n"
+    md = "\n".join(lines).strip() + "\n"
+    _LAST_RESUME.set(md)
+    return md
 
 
 # ========== Tool 2: 工作匹配 ==========
@@ -200,6 +283,22 @@ def match_jobs(
     ] = "",
 ) -> str:
     """根据简历与真实招聘信息做匹配度打分，返回按匹配度排序的推荐清单（含匹配点/缺口/建议）。"""
+    # 简历正文太短（模型传了空串/只传姓名）会让所有岗位算成 0 分，
+    # 这时回退到本请求里刚生成的简历，宁可多算一次也不要给用户一份全 0 的结果。
+    if len((resume_text or "").strip()) < 30:
+        fallback = _LAST_RESUME.get()
+        if fallback:
+            resume_text = fallback
+
+    if len((resume_text or "").strip()) < 10:
+        return json.dumps({
+            "error": "no_resume",
+            "hint": (
+                "没拿到简历正文。请把候选人的技能/经历摘要作为 resume_text 传入，"
+                "或先调用 generate_resume 生成简历后再匹配——不要用空文本调用，否则所有岗位都会算成 0 分。"
+            ),
+        }, ensure_ascii=False)
+
     jobs: list = []
     if jobs_json and jobs_json.strip():
         try:
@@ -265,14 +364,22 @@ def match_jobs(
             "location": job.get("location"),
             "salary": job.get("salary"),
             "url": job.get("url"),
+            "source": job.get("source"),
             "match_score": score,
             "matched_requirements": matched,
             "missing_requirements": missing,
+            # 前端据此渲染「去平台搜同岗位」按钮，确保用户随时能触达此刻在招的岗位
+            "search_urls": search_links(str(job.get("title") or ""), loc),
         })
 
     results.sort(key=lambda x: x["match_score"], reverse=True)
     return json.dumps(
-        {"count": len(results), "recommendations": results},
+        {
+            "count": len(results),
+            # 便于排查「匹配度全 0」是不是简历文本没传进来
+            "resume_chars": len((resume_text or "").strip()),
+            "recommendations": results,
+        },
         ensure_ascii=False,
         indent=2,
     )
@@ -286,11 +393,17 @@ def export_resume_pdf(
         "要导出的简历正文（Markdown，通常就是 generate_resume 的返回值原文）。不要传摘要或改写版本。",
     ],
     file_name: Annotated[str, "可选：自定义文件名（不带扩展名）"] = "",
+    template: Annotated[
+        str,
+        "可选：简历模板 id。classic=经典蓝（默认）、minimal=极简黑白、"
+        "sidebar=侧栏双栏、academic=学术严谨、campus=清新校园。"
+        "用户没指定风格时留空，系统会用默认模板。",
+    ] = "",
 ) -> str:
     """把简历正文渲染成 PDF 文件供用户下载，返回导出结果（文件名/页数/体积）。"""
     # 延迟导入：reportlab 缺失时不应连带整个 chat 路由启动失败
     try:
-        from .resume_pdf import build_pdf, suggest_filename, cache_put
+        from .resume_pdf import build_pdf, suggest_filename, cache_put, normalize_template
     except Exception as e:  # pragma: no cover
         return json.dumps(
             {"ok": False, "error": f"PDF 组件加载失败：{e}"}, ensure_ascii=False
@@ -303,8 +416,9 @@ def export_resume_pdf(
             ensure_ascii=False,
         )
 
+    tid = normalize_template(template)
     try:
-        pdf = build_pdf(md)
+        pdf = build_pdf(md, tid)
     except Exception as e:
         return json.dumps({"ok": False, "error": f"PDF 渲染失败：{e}"}, ensure_ascii=False)
 
@@ -317,8 +431,12 @@ def export_resume_pdf(
             "ok": True,
             "pdf_id": pdf_id,
             "filename": filename,
+            "template": tid,
             "size_kb": round(len(pdf) / 1024, 1),
-            "note": "系统会自动在回复下方附加「下载 PDF」按钮，你不需要粘贴 Base64 或链接。",
+            "note": (
+                "系统会自动在回复下方附加「下载 PDF」按钮，你不需要粘贴 Base64 或链接。"
+                "用户还可以在下载区切换其它模板重新导出。"
+            ),
         },
         ensure_ascii=False,
     )

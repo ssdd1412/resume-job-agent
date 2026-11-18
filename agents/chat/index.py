@@ -105,15 +105,25 @@ agent = Agent(
         "- generate_resume(profile_json)：把用户口述的信息整理成结构化 JSON（name / target_role / contact / summary / "
         "skills / education / experience / projects / certifications / languages），再调用它生成 Markdown 简历。\n"
         "- match_jobs(resume_text, jobs_json)：拿到简历正文后立即调用；jobs_json 留空表示读取招聘库 jobs.json；"
-        "用户粘贴了真实招聘信息时，把 JSON 数组传给 jobs_json。\n"
+        "用户粘贴了真实招聘信息时，把 JSON 数组传给 jobs_json。"
+        "resume_text 必须传 generate_resume 的完整返回值原文，或用户口述的完整技能/经历描述；"
+        "只传姓名或空串会让所有岗位都算成 0 分。\n"
         "- save_jobs(jobs_json)：用户明确要求把招聘信息长期保存时调用。\n"
-        "- export_resume_pdf(resume_markdown, file_name)：用户要「PDF 版 / 可下载版本 / 打印版」时调用，"
-        "resume_markdown 必须传 generate_resume 的原文，不要传摘要。调用成功后只需说一句"
-        "「PDF 已生成，点击下方按钮下载」并写出文件名和体积；"
+        "- export_resume_pdf(resume_markdown, file_name, template)：用户要「PDF 版 / 可下载版本 / 打印版」时调用，"
+        "resume_markdown 必须传 generate_resume 的原文，不要传摘要。template 可选 "
+        "classic（经典蓝，默认）/ minimal（极简黑白）/ sidebar（侧栏双栏）/ academic（学术严谨）/ campus（清新校园）。"
+        "调用成功后只需说一句「PDF 已生成，点击下方按钮下载」并写出文件名和体积；"
         "【不要】向用户解释系统实现（禁止出现「系统会自动附上入口」「后端已下发」这类说法），"
         "也不要输出 Base64 或编造下载链接。\n"
         "- 用户只要了简历、没提 PDF 时，不要主动调用 export_resume_pdf。\n"
         "- 用户只要求「生成简历」时，不要顺手调用 match_jobs；等用户明确说「帮我匹配岗位」再调。\n\n"
+        "【简历模板】\n"
+        "- 系统内置 5 套排版模板：经典蓝 classic、极简黑白 minimal、侧栏双栏 sidebar、学术严谨 academic、清新校园 campus。\n"
+        "- 用户问「有哪些模板 / 能换个样式」时：把这 5 个名称和各自风格一句话说清，并告诉他"
+        "「简历下方下载区可以直接挑模板，选完立即出新的 PDF」。\n"
+        "- 用户明确说「用双栏的 / 换成极简的 / 学术风的」时：调用 export_resume_pdf，"
+        "resume_markdown 仍传简历原文，template 传对应 id，不要为了换样式去改写简历内容。\n"
+        "- 模板只影响排版，不改一个字的正文；换模板时不要重新生成简历、不要改动任何经历与数字。\n\n"
         "【不得编造（最高优先级）】\n"
         "- 只使用用户提供的真实信息。不得虚构公司、学校、时间、奖项、指标数字。\n"
         "- 严禁以「合理凝练」「适当润色」的名义新增量化成果（例如凭空写「提升 20%」）。可以润色措辞，不可以创造事实。\n"
@@ -121,7 +131,11 @@ agent = Agent(
         "【回复格式】\n"
         "本系统会把你调用 generate_resume 得到的简历正文自动完整展示在对话里，因此你【不要重复输出简历正文】，"
         "只需在简历之后用 1~3 条要点说明「哪里还可以补强、补什么」。\n"
-        "匹配结果按「岗位 → 匹配度 → 命中要求 → 待补强缺口」的列表或表格呈现（这部分由你输出），然后给 1~3 条建议。\n"
+        "岗位匹配结果由前端卡片呈现：岗位名、公司、地点、薪资、匹配度、缺口、原岗位链接、"
+        "平台实时搜索按钮都已经显示在卡片上。因此你【不要】再用表格或列表复述岗位，"
+        "也【不要】贴任何 URL 或搜索链接，连薪资、匹配度百分比、缺口清单也不必再念一遍；"
+        "只在卡片之后用 3~5 行说清：最该先投哪 1~2 个（只写岗位名和公司）及理由、"
+        "这些岗位的共同缺口、下一步补什么。\n"
         "用中文，专业、简洁、不啰嗦。"
     ),
     tools=[generate_resume, match_jobs, save_jobs, export_resume_pdf, polish_resume],
@@ -205,8 +219,10 @@ async def _event_stream(
                     if isinstance(out, str) and out.strip():
                         logger.log(f"[stream] inject resume markdown ({len(out)} chars)")
                         yield sse_event("text_delta", {"delta": out.rstrip() + "\n\n"})
-                        # 告知前端这一屏是简历，可以就地提供「下载 PDF」入口
-                        yield sse_event("resume_ready", {"chars": len(out)})
+                        # 告知前端这一屏是简历，可以就地提供「下载 PDF」入口；
+                        # markdown 一并下发给前端，换模板重排时只排简历本体，
+                        # 不会把后面模型补的说明文字也排进 PDF。
+                        yield sse_event("resume_ready", {"chars": len(out), "markdown": out})
 
                 # 润色定稿：模型把改好的完整正文交给工具时，工具已存入进程内缓存；
                 # 这里按 rid 取回原文直接推给前端，避免模型二次复述时摘要/截断。
@@ -223,11 +239,31 @@ async def _event_stream(
                     if md:
                         logger.log(f"[stream] inject polished resume ({len(md)} chars)")
                         yield sse_event("text_delta", {"delta": md.rstrip() + "\n\n"})
-                        yield sse_event("resume_ready", {"chars": len(md)})
+                        yield sse_event("resume_ready", {"chars": len(md), "markdown": md})
                     else:
                         logger.error(
                             "[stream] polished resume skipped: 缓存未命中（模型可能没提交完整正文）"
                         )
+
+                # 岗位匹配结果结构化下发给前端：正文里模型只讲结论，
+                # 卡片（原岗位链接 + 平台实时搜索）由前端渲染，避免一堆裸 URL 堆在回答里。
+                elif name == "match_jobs":
+                    out = getattr(item, "output", None)
+                    data: dict = {}
+                    if isinstance(out, str) and out.strip():
+                        try:
+                            data = json.loads(out)
+                        except (json.JSONDecodeError, TypeError):
+                            data = {}
+                    recs = data.get("recommendations") if isinstance(data, dict) else None
+                    if isinstance(recs, list) and recs:
+                        logger.log(f"[stream] emit jobs_ready: {len(recs)} jobs")
+                        yield sse_event("jobs_ready", {
+                            "jobs": recs[:8],
+                            "total": data.get("count") or len(recs),
+                        })
+                    else:
+                        logger.log("[stream] jobs_ready skipped: 无匹配结果（可能招聘库为空）")
 
                 # PDF 由后端直接下发：工具只回传一个小体积的 pdf_id，
                 # 真实字节走 pdf_ready 事件，避免把 Base64 灌进模型上下文。
@@ -255,6 +291,7 @@ async def _event_stream(
                         yield sse_event("pdf_ready", {
                             "filename": meta.get("filename") or "简历.pdf",
                             "size": len(pdf_bytes),
+                            "template": meta.get("template") or "classic",
                             "base64": base64.b64encode(pdf_bytes).decode(),
                         })
                     else:

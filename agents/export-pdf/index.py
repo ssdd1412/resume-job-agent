@@ -10,8 +10,8 @@ Export-PDF handler — EdgeOne Makers
   - 本路由：前端点「下载 PDF」时按需转换，不依赖任何服务端状态
 两者共用 agents/resume_pdf.py 的 export_payload()。
 
-请求：{ "markdown": "...", "file_name": "可选" }
-返回：{ "ok": true, "filename": "...", "size": 12345, "base64": "..." }
+请求：{ "markdown": "...", "file_name": "可选", "template": "classic|minimal|sidebar|academic|campus" }
+返回：{ "ok": true, "filename": "...", "size": 12345, "template": "...", "base64": "..." }
 """
 
 from .._logger import create_logger
@@ -26,6 +26,7 @@ async def handler(context):
 
     markdown = body.get("markdown") or ""
     file_name = (body.get("file_name") or "").strip()
+    template = (body.get("template") or "").strip()
 
     # 延迟导入，避免 PDF 依赖缺失时连带整个路由无法启动
     try:
@@ -37,10 +38,12 @@ async def handler(context):
             "body": {"ok": False, "error": f"PDF 组件加载失败：{e}"},
         }
 
-    result = export_payload(markdown, file_name)
+    result = export_payload(markdown, file_name, template)
     if not result.get("ok"):
         logger.error(f"export failed: {result.get('error')}")
         return {"status_code": 400, "body": result}
 
-    logger.log(f"generated {result['filename']} ({result['size']} bytes)")
+    logger.log(
+        f"generated {result['filename']} template={result.get('template')} ({result['size']} bytes)"
+    )
     return {"status_code": 200, "body": result}

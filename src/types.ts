@@ -24,6 +24,40 @@ export interface Message {
    * round trip.
    */
   pdf?: PdfPayload;
+
+  /**
+   * 简历原文（resume_ready 带下来的 Markdown）。
+   * 换模板重排 PDF 时用它，避免把模型后面补的说明文字也排进简历。
+   */
+  resumeMarkdown?: string;
+
+  /**
+   * 岗位匹配结果（jobs_ready 事件）。
+   * 卡片式渲染，带原岗位链接和平台实时搜索入口。
+   */
+  jobs?: JobCard[];
+  /** 匹配到的岗位总数（卡片只展示前几条）。 */
+  jobsTotal?: number;
+}
+
+/** 平台实时搜索链接（如 BOSS直聘 · 数据分析 · 深圳） */
+export interface JobSearchLink {
+  site: string;
+  url: string;
+}
+
+export interface JobCard {
+  title?: string;
+  company?: string;
+  location?: string;
+  salary?: string;
+  /** 原岗位详情页（抓取时的快照链接，可能已下线） */
+  url?: string;
+  source?: string;
+  match_score?: number;
+  matched_requirements?: string[];
+  missing_requirements?: string[];
+  search_urls?: JobSearchLink[];
 }
 
 export interface PdfPayload {
@@ -31,6 +65,8 @@ export interface PdfPayload {
   /** Base64 of the raw PDF bytes (no data: prefix). */
   base64: string;
   size?: number;
+  /** 生成这份 PDF 用的模板 id，换模板时据此判断能否复用字节。 */
+  template?: string;
 }
 
 /**
