@@ -101,6 +101,18 @@ const en = {
   // Language toggle
   "lang.switch": "中文",
 
+  // Theme switcher
+  "theme.title": "Switch theme",
+  "theme.accent": "Accent color",
+  "theme.mode": "Appearance",
+  "theme.gold": "Gold",
+  "theme.blue": "Blue",
+  "theme.purple": "Purple",
+  "theme.green": "Green",
+  "theme.pink": "Pink",
+  "theme.dark": "Dark",
+  "theme.light": "Light",
+
   // ─── Floating bottom-right action badges ─────────────────────────────
   "floatingLink.deploy": "Deploy",
   "floatingLink.github": "GitHub",

@@ -22,6 +22,8 @@ import ConversationSidebar from './components/ConversationSidebar';
 import FollowUpDialog from './components/FollowUpDialog';
 import GitHubLink from './components/GitHubLink';
 import DeployLink from './components/DeployLink';
+import ThemeSwitcher from './components/ThemeSwitcher';
+import { initTheme } from './lib/themeStore';
 import { I18nProvider, LangToggle, useT, MessageKeys } from './i18n';
 import { deleteSnapshot, loadSnapshot, saveSnapshot } from './lib/chatUiStore';
 import { buildResumePrompt, attachmentDisplayText } from './lib/resumeAttachment';
@@ -48,6 +50,9 @@ const LAMP_I18N_KEYS: Record<string, string> = {
   save_jobs: 'tool.save',
   export_resume_pdf: 'tool.pdf',
 };
+
+// Apply persisted theme before first paint to avoid a flash of default tokens.
+initTheme();
 
 const CONVERSATION_ID_STORAGE_KEY = 'eo_conversation_id';
 
@@ -91,7 +96,10 @@ let _historyFetchInFlight = false;
 export default function App() {
   return (
     <I18nProvider>
-      <LangToggle />
+      <div className="floating-controls">
+        <ThemeSwitcher />
+        <LangToggle />
+      </div>
       <AppInner />
     </I18nProvider>
   );

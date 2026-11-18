@@ -6,7 +6,7 @@
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: rgba(4, 4, 10, 0.72);
+  background: var(--dialog-overlay);
   backdrop-filter: blur(6px);
   animation: fadeIn var(--transition-med) both;
 }
@@ -38,7 +38,7 @@
   height: 38px;
   flex-shrink: 0;
   font-size: 1.1rem;
-  color: #0a0a0f;
+  color: var(--on-accent);
   background: var(--accent-gold);
   border-radius: 12px;
 }
@@ -130,7 +130,7 @@
 .skip:hover:not(:disabled) { color: var(--text-primary); border-color: var(--text-secondary); }
 
 .submit {
-  color: #0a0a0f;
+  color: var(--on-accent);
   background: var(--accent-gold);
   border: 1px solid var(--accent-gold);
 }

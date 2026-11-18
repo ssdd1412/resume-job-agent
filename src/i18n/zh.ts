@@ -101,6 +101,18 @@ const zh = {
   // Language toggle
   "lang.switch": "English",
 
+  // Theme switcher
+  "theme.title": "切换主题颜色",
+  "theme.accent": "主题色",
+  "theme.mode": "明暗模式",
+  "theme.gold": "金色",
+  "theme.blue": "蓝色",
+  "theme.purple": "紫色",
+  "theme.green": "绿色",
+  "theme.pink": "粉色",
+  "theme.dark": "深色",
+  "theme.light": "浅色",
+
   // ─── Floating bottom-right action badges ─────────────────────────────
   "floatingLink.deploy": "一键部署",
   "floatingLink.github": "GitHub",

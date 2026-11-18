@@ -4,7 +4,28 @@
   padding: 0;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   Design tokens — themeable via [data-theme] + [data-accent]
+   on <html>.  Default = dark + gold (matches the original look).
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Shared, theme-independent tokens */
 :root {
+  --font-display: 'Syne', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+
+  --transition-fast: 140ms cubic-bezier(.4,0,.2,1);
+  --transition-med: 280ms cubic-bezier(.4,0,.2,1);
+}
+
+/* ── Base palette: DARK ─────────────────────────────────────── */
+:root,
+:root[data-mode="dark"] {
   --bg-base: #0a0a0f;
   --bg-surface: #111118;
   --bg-elevated: #18181f;
@@ -14,26 +35,157 @@
   --text-secondary: #8888aa;
   --text-muted: #44445a;
 
-  --accent-gold: #f5c842;
-  --accent-gold-dim: #f5c84230;
-  --accent-gold-glow: #f5c84260;
-
   --user-bubble: #1e1e2e;
   --user-border: #3a3a5a;
   --bot-bubble: #151520;
   --bot-border: #252535;
 
-  --font-display: 'Syne', sans-serif;
-  --font-mono: 'DM Mono', monospace;
+  --overlay-weak: rgba(255, 255, 255, .015);
+  --overlay-faint: rgba(255, 255, 255, .03);
+  --overlay-soft: rgba(255, 255, 255, .06);
+  --overlay-glass: rgba(255, 255, 255, .04);
+  --overlay-glass-hover: rgba(255, 255, 255, .08);
 
-  --radius-sm: 6px;
-  --radius-md: 12px;
-  --radius-lg: 20px;
-  --radius-xl: 28px;
+  --shadow-card: 0 8px 40px rgba(0, 0, 0, .5);
+  --code-inline-bg: rgba(255, 255, 255, .06);
+  --code-block-bg: rgba(0, 0, 0, .3);
+  --table-head-bg: rgba(255, 255, 255, .04);
+  --dialog-overlay: rgba(4, 4, 10, .72);
+  --blob-2: rgba(90, 74, 242, .08);
+  --sidebar-bg: rgba(10, 10, 16, .78);
+  --debug-panel-bg: rgba(10, 10, 14, .92);
+  --code-panel-bg: #0c0b08;
 
-  --shadow-card: 0 8px 40px rgba(0,0,0,0.5);
-  --transition-fast: 140ms cubic-bezier(.4,0,.2,1);
-  --transition-med: 280ms cubic-bezier(.4,0,.2,1);
+  --on-accent: #0a0a0f;
+  --accent-hover: #ffe066;
+  color-scheme: dark;
+}
+
+/* ── Base palette: LIGHT ────────────────────────────────────── */
+:root[data-mode="light"] {
+  --bg-base: #eef0f7;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f6f7fb;
+  --bg-border: #dcdfea;
+
+  --text-primary: #1c1d2b;
+  --text-secondary: #5a5d78;
+  --text-muted: #9a9db4;
+
+  --user-bubble: #eceaf7;
+  --user-border: #d6d2ec;
+  --bot-bubble: #ffffff;
+  --bot-border: #e4e6f0;
+
+  --overlay-weak: rgba(20, 22, 45, .015);
+  --overlay-faint: rgba(20, 22, 45, .035);
+  --overlay-soft: rgba(20, 22, 45, .07);
+  --overlay-glass: rgba(20, 22, 45, .035);
+  --overlay-glass-hover: rgba(20, 22, 45, .07);
+
+  --shadow-card: 0 10px 36px rgba(38, 42, 84, .14);
+  --code-inline-bg: rgba(20, 22, 45, .06);
+  --code-block-bg: rgba(20, 22, 45, .05);
+  --table-head-bg: rgba(20, 22, 45, .035);
+  --dialog-overlay: rgba(28, 29, 43, .38);
+  --blob-2: rgba(90, 74, 242, .06);
+  --sidebar-bg: rgba(255, 255, 255, .82);
+  --debug-panel-bg: rgba(255, 255, 255, .9);
+  --code-panel-bg: #faf8f2;
+
+  --on-accent: #ffffff;
+  color-scheme: light;
+}
+
+/* ── Accent: GOLD (default) ─────────────────────────────────── */
+:root,
+:root[data-accent="gold"] {
+  --accent-rgb: 245, 200, 66;
+  --accent: #f5c842;
+  --accent-dim: #f5c84230;
+  --accent-glow: #f5c84260;
+  --accent-rgb-strong: 245, 200, 66;
+  --accent-hover: #ffe066;
+  --on-accent: #0a0a0f;
+}
+/* Light mode keeps a slightly deeper gold so text stays readable on white */
+:root[data-mode="light"][data-accent="gold"] {
+  --accent: #b8860b;
+  --accent-hover: #a67c00;
+  --on-accent: #ffffff;
+}
+
+/* ── Accent: BLUE ───────────────────────────────────────────── */
+:root[data-accent="blue"] {
+  --accent-rgb: 91, 140, 255;
+  --accent: #5b8cff;
+  --accent-dim: #5b8cff30;
+  --accent-glow: #5b8cff60;
+  --accent-rgb-strong: 91, 140, 255;
+  --accent-hover: #7fa6ff;
+  --on-accent: #06122e;
+}
+:root[data-mode="light"][data-accent="blue"] {
+  --accent: #2f5fe0;
+  --accent-hover: #214dc4;
+  --on-accent: #ffffff;
+}
+
+/* ── Accent: PURPLE ─────────────────────────────────────────── */
+:root[data-accent="purple"] {
+  --accent-rgb: 167, 122, 250;
+  --accent: #a77afa;
+  --accent-dim: #a77afa30;
+  --accent-glow: #a77afa60;
+  --accent-rgb-strong: 167, 122, 250;
+  --accent-hover: #c099ff;
+  --on-accent: #14062e;
+}
+:root[data-mode="light"][data-accent="purple"] {
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --on-accent: #ffffff;
+}
+
+/* ── Accent: GREEN ──────────────────────────────────────────── */
+:root[data-accent="green"] {
+  --accent-rgb: 62, 214, 153;
+  --accent: #3ed699;
+  --accent-dim: #3ed69930;
+  --accent-glow: #3ed69960;
+  --accent-rgb-strong: 62, 214, 153;
+  --accent-hover: #6ee7b7;
+  --on-accent: #04261a;
+}
+:root[data-mode="light"][data-accent="green"] {
+  --accent: #128a5f;
+  --accent-hover: #0e714f;
+  --on-accent: #ffffff;
+}
+
+/* ── Accent: PINK ───────────────────────────────────────────── */
+:root[data-accent="pink"] {
+  --accent-rgb: 244, 114, 182;
+  --accent: #f472b6;
+  --accent-dim: #f472b630;
+  --accent-glow: #f472b660;
+  --accent-rgb-strong: 244, 114, 182;
+  --accent-hover: #f9a8d4;
+  --on-accent: #2e0620;
+}
+:root[data-mode="light"][data-accent="pink"] {
+  --accent: #c0267f;
+  --accent-hover: #a51d6b;
+  --on-accent: #ffffff;
+}
+
+/* ── Back-compat aliases ──────────────────────────────────────
+   Components already reference --accent-gold* everywhere. These
+   aliases resolve to the active accent, so switching just works. */
+:root {
+  --accent-gold: var(--accent);
+  --accent-gold-dim: var(--accent-dim);
+  --accent-gold-glow: var(--accent-glow);
 }
 
 html, body, #root {
@@ -44,6 +196,7 @@ html, body, #root {
   font-family: var(--font-mono);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
+  transition: background var(--transition-med), color var(--transition-med);
 }
 
 /* scrollbar */
@@ -52,27 +205,34 @@ html, body, #root {
 ::-webkit-scrollbar-thumb { background: var(--bg-border); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
-/* Language toggle */
-.lang-toggle {
+/* ── Floating controls cluster (top-right) ─────────────────── */
+.floating-controls {
   position: fixed;
   top: 14px;
   right: 18px;
   z-index: 1000;
   display: flex;
   align-items: center;
+  gap: 8px;
+}
+
+/* Language toggle */
+.lang-toggle {
+  display: flex;
+  align-items: center;
   gap: 2px;
   padding: 6px 14px;
   border-radius: 20px;
-  border: none;
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--overlay-glass);
+  background: var(--overlay-glass);
   backdrop-filter: blur(12px);
   cursor: pointer;
-  transition: background 0.3s ease, box-shadow 0.3s ease;
+  transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
   line-height: 1;
 }
 .lang-toggle:hover {
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 0 20px rgba(245, 200, 66, 0.06);
+  background: var(--overlay-glass-hover);
+  box-shadow: 0 0 20px rgba(var(--accent-rgb), .12);
 }
 .lang-toggle:active {
   transform: scale(0.96);
@@ -95,9 +255,9 @@ html, body, #root {
 .lang-toggle__label--active {
   font-size: 14px;
   font-weight: 700;
-  color: var(--accent-gold);
+  color: var(--accent);
   transform: scale(1);
-  text-shadow: 0 0 12px var(--accent-gold-glow);
+  text-shadow: 0 0 12px var(--accent-glow);
 }
 .lang-toggle__sep {
   font-family: var(--font-mono);
