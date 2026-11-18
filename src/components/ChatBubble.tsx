@@ -18,6 +18,7 @@ import styles from './ChatBubble.module.css';
 
 interface Props {
   message: Message;
+  conversationId?: string;
 }
 
 /**
@@ -161,7 +162,7 @@ function normalizeMarkdown(content: string): string {
 const templateNameKey = (id: string) => `tpl.${id}` as MessageKeys;
 const templateDescKey = (id: string) => `tpl.${id}.desc` as MessageKeys;
 
-export default memo(function ChatBubble({ message }: Props) {
+export default memo(function ChatBubble({ message, conversationId }: Props) {
   const { t, lang } = useT();
   const isUser = message.role === 'user';
 
@@ -216,7 +217,7 @@ export default memo(function ChatBubble({ message }: Props) {
   const renderPdf = async (templateId: string): Promise<PdfPayload | null> => {
     setPdfError(null);
     try {
-      const pdf = await exportResumePdf(resumeSource, undefined, templateId);
+      const pdf = await exportResumePdf(resumeSource, undefined, templateId, conversationId);
       setRendered(pdf);
       return pdf;
     } catch (e) {

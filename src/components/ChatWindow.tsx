@@ -7,9 +7,10 @@ import styles from './ChatWindow.module.css';
 interface Props {
   messages: Message[];
   loading: boolean;
+  conversationId?: string;
 }
 
-export default function ChatWindow({ messages, loading }: Props) {
+export default function ChatWindow({ messages, loading, conversationId }: Props) {
   const windowRef = useRef<HTMLDivElement>(null);
   const { t } = useT();
 
@@ -45,7 +46,7 @@ export default function ChatWindow({ messages, loading }: Props) {
       )}
 
       {messages.map(msg => (
-        <ChatBubble key={msg.id} message={msg} />
+        <ChatBubble key={msg.id} message={msg} conversationId={conversationId} />
       ))}
 
       {showTypingIndicator && (

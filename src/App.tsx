@@ -648,7 +648,7 @@ function AppInner() {
           </header>
 
           <div className={styles.chatWindowShell}>
-            <ChatWindow messages={messages} loading={loading} />
+            <ChatWindow messages={messages} loading={loading} conversationId={conversationIdRef.current} />
             {historyLoading && messages.length === 0 && (
               <div className={styles.historyOverlay}>
                 <div className={styles.historySpinner} />

@@ -419,10 +419,16 @@ export async function exportResumePdf(
   markdown: string,
   fileName?: string,
   template?: string,
+  conversationId?: string,
 ): Promise<PdfPayload> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  // EdgeOne 云函数强制校验该请求头（6-36 位），缺失直接 400。
+  if (conversationId) {
+    headers['makers-conversation-id'] = conversationId;
+  }
   const res = await fetch(API.exportPdf, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ markdown, file_name: fileName, template }),
   });
 
