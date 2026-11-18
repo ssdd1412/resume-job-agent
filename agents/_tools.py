@@ -31,6 +31,86 @@ _LAST_RESUME: contextvars.ContextVar[str] = contextvars.ContextVar(
     "last_resume", default=""
 )
 
+# 本次 generate_resume 从 profile 里算出的待补充问题。
+# 模型经常不主动调 report_missing_info（把「待补充」写进正文），
+# 所以后端直接算缺失字段，随 resume_ready 一起下发，前端才一定能弹窗。
+# 注意：SDK 的 function_tool 可能在 copy_context 里执行，ContextVar 的 set 不会
+# 回传到外层，所以这里用模块级变量；单实例串行请求场景足够，chunk 立即取走清空。
+_FOLLOWUPS_CACHE: list = []
+
+
+def set_followups(questions: list) -> None:
+    global _FOLLOWUPS_CACHE
+    _FOLLOWUPS_CACHE = list(questions)
+
+
+def get_followups() -> list:
+    """取走本次生成算出的待补充问题（读完即清，避免串到下一轮）。"""
+    global _FOLLOWUPS_CACHE
+    items = list(_FOLLOWUPS_CACHE)
+    _FOLLOWUPS_CACHE = []
+    return items
+
+
+def _derive_followups(p: dict) -> list:
+    """从结构化 profile 的缺失字段推导待补充问题（最多 6 条）。"""
+    questions: list[str] = []
+
+    def add(q: str) -> None:
+        if q not in questions and len(questions) < 6:
+            questions.append(q)
+
+    def filled(v) -> bool:
+        return bool(str(v or "").strip())
+
+    name = str(p.get("name") or "").strip()
+    if not name or name in ("候选人", "待补充"):
+        add("你的姓名是什么？")
+
+    contact = p.get("contact") or {}
+    if isinstance(contact, dict):
+        if not filled(contact.get("phone")):
+            add("你的手机号码是多少？")
+        if not filled(contact.get("email")):
+            add("你的邮箱地址是多少？")
+    if not filled(p.get("location")) and not (
+        isinstance(contact, dict) and filled(contact.get("location"))
+    ):
+        add("你目前所在的城市，以及想投递的城市是哪里？")
+
+    if not filled(p.get("summary")):
+        add("请用 2~3 句话介绍你自己（优势、方向、经验年限）。")
+
+    edu = [e for e in (p.get("education") or []) if isinstance(e, dict)]
+    if not edu or not any(filled(e.get("school")) for e in edu):
+        add("你的毕业院校、学历和专业是什么？")
+    else:
+        e = next((e for e in edu if filled(e.get("school"))), {})
+        if not filled(e.get("major")):
+            add("你就读的专业是什么？")
+        if not filled(e.get("start")) or not filled(e.get("end")):
+            add("你的入学和毕业时间分别是什么时候？")
+
+    exp = [x for x in (p.get("experience") or []) if isinstance(x, dict)]
+    if not exp or not any(filled(x.get("company")) for x in exp):
+        add("你有过哪些实习或工作经历？请写公司名和岗位。")
+    else:
+        x = next((x for x in exp if filled(x.get("company"))), {})
+        if not filled(x.get("start")) or not filled(x.get("end")):
+            add("你这段实习/工作的起止时间是什么时候？")
+
+    proj = [pr for pr in (p.get("projects") or []) if isinstance(pr, dict)]
+    if proj:
+        pr = proj[0]
+        pname = str(pr.get("name") or "这个项目").strip()
+        bullets = pr.get("bullets") or []
+        if not bullets:
+            add(f"「{pname}」你具体做了什么？承担什么角色？")
+        else:
+            add(f"「{pname}」有没有可以量化的成果（数据指标、规模、提升幅度）？")
+
+    return questions
+
 
 # ========== 工具函数 ==========
 def _load_jobs() -> list:
@@ -282,6 +362,7 @@ def generate_resume(
 
     md = "\n".join(lines).strip() + "\n"
     _LAST_RESUME.set(md)
+    set_followups(_derive_followups(p))
     return md
 
 
@@ -603,3 +684,33 @@ def save_jobs(
     added = _merge_jobs(data)
     total = len(_load_jobs())
     return f"写入完成：本次新增 {added} 条，jobs.json 当前共 {total} 条真实招聘信息。"
+
+
+# ========== Tool 5: 待补充信息（结构化下发，前端弹窗收集） ==========
+@function_tool
+def report_missing_info(
+    questions_json: Annotated[
+        str,
+        "JSON 数组字符串，每个元素是一条需要用户补充的具体问句，例如 "
+        '["医疗 NER 项目的 F1 值是多少？", "电商看板上线后支持了哪些业务决策？"]',
+    ]
+) -> str:
+    """生成简历或润色定稿后，把仍缺的信息整理成问题清单，让前端弹窗请用户逐条补齐。"""
+    try:
+        data = json.loads(questions_json)
+        if not isinstance(data, list):
+            return "questions_json 必须是 JSON 数组。"
+    except Exception as e:
+        return f"解析失败：{e}。"
+    questions: list[str] = []
+    seen: set[str] = set()
+    for q in data:
+        text = str(q).strip()
+        if text and text not in seen:
+            seen.add(text)
+            questions.append(text)
+        if len(questions) >= 6:
+            break
+    if not questions:
+        return "没有有效的补充问题，不要调用这个工具。"
+    return json.dumps({"ok": True, "questions": questions}, ensure_ascii=False)

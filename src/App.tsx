@@ -19,6 +19,7 @@ import ChatInput from './components/ChatInput';
 import DebugPanel from './components/DebugPanel';
 import CodeViewer from './components/CodeViewer';
 import ConversationSidebar from './components/ConversationSidebar';
+import FollowUpDialog from './components/FollowUpDialog';
 import GitHubLink from './components/GitHubLink';
 import DeployLink from './components/DeployLink';
 import { I18nProvider, LangToggle, useT, MessageKeys } from './i18n';
@@ -114,6 +115,8 @@ function AppInner() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [debugEvents, setDebugEvents] = useState<RawSseEvent[]>([]);
   const [rightPanelMode, setRightPanelMode] = useState<'code' | 'debug'>('code');
+  // 待补充信息弹窗：模型提交问题后弹出，用户填完自动回填成消息
+  const [followups, setFollowups] = useState<string[] | null>(null);
 
   // Conversation list (sidebar) state
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -413,6 +416,11 @@ function AppInner() {
         );
       },
 
+      onFollowupsReady(questions) {
+        // 模型把待补充项结构化下发 → 弹窗逐条收集，不写进正文
+        if (questions.length > 0) setFollowups(questions);
+      },
+
       onToolCalled(toolName) {
         setLamps(prev =>
           prev.map(l =>
@@ -484,6 +492,15 @@ function AppInner() {
     abortCtrlRef.current = ctrl;
   }, [updateBotMessage, clearBotStreaming, finishStream, refreshConversations, t]);
 
+  /** 待补充弹窗提交：把问答拼成一条消息，让 agent 基于补充信息重出简历。 */
+  const handleFollowupSubmit = useCallback((answers: string[]) => {
+    setFollowups(null);
+    const text =
+      '我补充以下信息，请把它们填进刚才那份简历，重新生成一份完整定稿（其余真实经历和已有内容保持不变）：\n'
+      + answers.map((a, i) => `${i + 1}. ${a}`).join('\n');
+    void handleSend(text);
+  }, [handleSend]);
+
   const handleClearHistory = useCallback(() => {
     const oldConvId = conversationIdRef.current;
 
@@ -553,6 +570,7 @@ function AppInner() {
     conversationIdRef.current = id;
     setActiveConversationId(id);
     setRightPanelMode('code');
+    setFollowups(null);
     void loadConversation(id);
   }, [loading, loadConversation]);
 
@@ -567,6 +585,7 @@ function AppInner() {
     setMessages([]);
     setDebugEvents([]);
     setRightPanelMode('code');
+    setFollowups(null);
     initDoneRef.current = false;
     setHistoryLoading(false);
   }, [loading]);
@@ -668,6 +687,14 @@ function AppInner() {
       </div>
       <GitHubLink />
       <DeployLink />
+      {followups && (
+        <FollowUpDialog
+          questions={followups}
+          busy={loading}
+          onSkip={() => setFollowups(null)}
+          onSubmit={handleFollowupSubmit}
+        />
+      )}
     </div>
   );
 }

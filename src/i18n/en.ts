@@ -60,6 +60,15 @@ const en = {
   "jobs.source": "Source",
   "jobs.missing": "Gaps",
 
+  // Missing-info dialog
+  "followup.title": "Fill these in for a stronger resume",
+  "followup.hint": "Your resume is missing the details below. Fill them in and I'll update it automatically — or just skip.",
+  "followup.placeholder": "Your answer (leave blank to skip)",
+  "followup.skip": "Skip for now",
+  "followup.submit": "Submit & update resume",
+  "followup.sending": "Updating…",
+  "followup.count": "{n} item(s) to fill in",
+
   // Status & errors
   "status.error": "⚠️ Connection lost. Refresh the page and try again.",
   "status.stopped": "⏹ *Generation stopped*",

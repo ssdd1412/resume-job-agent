@@ -161,6 +161,20 @@
 原因：EdgeOne 云函数只打包 `agents/` 下的 Python 模块，根目录的 `jobs.json` 不会随行。
 `agents/jobs_data.py` 是内嵌副本，`_load_jobs()` 在读不到文件时回退到它。
 
+### 8. 待补充信息弹窗
+
+简历缺项不再写在正文里，改为弹窗逐条收集：
+
+- `generate_resume` 从 `profile_json` 的缺失字段直接算问题（手机号、邮箱、院校、专业、
+  起止时间、项目量化成果等，最多 6 条），存进模块级变量；`chat/index.py` 下发 `resume_ready`
+  时一并推 `followups_ready`。**不依赖模型多调工具**——实测 qwen-plus 经常把「待补充」
+  写进正文而不调 `report_missing_info`，所以必须有后端兜底。
+- 模型主动调 `report_missing_info(questions_json)` 时也能下发；两路用 `followups_sent` 去重。
+- 前端 `FollowUpDialog` 弹窗收集答案，提交后自动拼成一条消息重新生成简历；
+  已补的项在新一轮 profile 里不再缺失，所以弹窗会逐轮收敛。「暂时跳过」直接关闭。
+- 注意：SDK 的 `function_tool` 可能在 `copy_context()` 里执行，`ContextVar` 的 `set()`
+  不会回传到外层——`_FOLLOWUPS_CACHE` 用模块级变量而不是 ContextVar，就是这个原因。
+
 ---
 
 ## 三、本地运行
@@ -244,6 +258,7 @@ AI_GATEWAY_MODEL=qwen-plus                                              # 需支
   新增 `pdf_ready` / `resume_ready` 事件处理、「下载 PDF」按钮与模板挑选面板
 - `src/components/ChatInput.tsx`、`src/lib/resumeAttachment.ts` —— 新增附件按钮 / 拖拽上传 /
   附件卡片 / 历史消息里的原文折叠
+- `followups_ready` 事件 + `FollowUpDialog` 弹窗：缺项结构化收集，提交后自动回填重生成
 - `jobs_ready` 事件 + `JobBoard` 卡片：岗位匹配结果结构化下发，每张卡带原岗位与三家平台实时搜索
 - `src/App.tsx`、`src/i18n/{zh,en}.ts`、`src/components/CodeViewer.tsx` ——
   指示灯 / 文案 / 代码示例全部换成简历与岗位语义

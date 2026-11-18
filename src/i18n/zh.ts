@@ -60,6 +60,15 @@ const zh = {
   "jobs.source": "来源",
   "jobs.missing": "缺口",
 
+  // 待补充信息弹窗
+  "followup.title": "补齐这几项，简历更完整",
+  "followup.hint": "下面这些信息简历里还没有，填完我会自动更新简历；不想填可以直接跳过。",
+  "followup.placeholder": "在这里填写（可留空）",
+  "followup.skip": "暂时跳过",
+  "followup.submit": "提交并更新简历",
+  "followup.sending": "正在更新…",
+  "followup.count": "共 {n} 项待补充",
+
   // Status & errors
   "status.error": "⚠️ 连接已断开，请刷新页面后重新发送。",
   "status.stopped": "⏹ *已停止生成*",

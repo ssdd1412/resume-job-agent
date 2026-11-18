@@ -49,6 +49,8 @@ export interface StreamCallbacks {
   onPdfReady?: (pdf: PdfPayload) => void;
   /** Backend pushed structured job matches (jobs_ready). */
   onJobsReady?: (jobs: JobCard[], total: number) => void;
+  /** Backend asked the user to fill in missing resume details (followups_ready). */
+  onFollowupsReady?: (questions: string[]) => void;
   onDone: () => void;
   onError: (err: Error) => void;
   onRawEvent?: (event: RawSseEvent) => void;
@@ -266,6 +268,13 @@ function dispatchSseChunk(part: string, cb: StreamCallbacks, markDone: () => voi
         cb.onJobsReady?.(
           Array.isArray(parsed.jobs) ? (parsed.jobs as JobCard[]) : [],
           typeof parsed.total === 'number' ? parsed.total : 0,
+        );
+        break;
+      case 'followups_ready':
+        cb.onFollowupsReady?.(
+          Array.isArray(parsed.questions)
+            ? parsed.questions.filter((q: unknown) => typeof q === 'string')
+            : [],
         );
         break;
       case 'error':

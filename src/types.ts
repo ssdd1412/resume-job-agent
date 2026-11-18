@@ -38,6 +38,12 @@ export interface Message {
   jobs?: JobCard[];
   /** 匹配到的岗位总数（卡片只展示前几条）。 */
   jobsTotal?: number;
+
+  /**
+   * 待补充问题清单（followups_ready 事件）。
+   * 模型生成/润色简历后提交，前端弹窗逐条收集，用户填完自动回填。
+   */
+  followups?: string[];
 }
 
 /** 平台实时搜索链接（如 BOSS直聘 · 数据分析 · 深圳） */
