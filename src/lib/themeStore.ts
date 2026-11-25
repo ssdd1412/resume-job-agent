@@ -22,14 +22,14 @@ export const ACCENTS: { id: Accent; swatch: string; labelKey: string }[] = [
 
 export function readAccent(): Accent {
   const v = localStorage.getItem(ACCENT_KEY) as Accent | null;
-  return v && ACCENTS.some(a => a.id === v) ? v : 'gold';
+  return v && ACCENTS.some(a => a.id === v) ? v : 'blue';
 }
 
 export function readMode(): Mode {
   const v = localStorage.getItem(MODE_KEY);
   if (v === 'light' || v === 'dark') return v;
-  // Default to dark + gold so the app keeps its signature look on first visit.
-  return 'dark';
+  // Default to a clean light + blue look; users can still switch any time.
+  return 'light';
 }
 
 export function applyAccent(accent: Accent) {

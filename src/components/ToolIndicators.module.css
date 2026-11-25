@@ -28,3 +28,9 @@
   from { opacity: 0; transform: translateY(-6px) scale(.9); }
   to   { opacity: 1; transform: translateY(0)    scale(1);  }
 }
+
+/* On narrow screens the tool lamps duplicate the quick-action chips below
+   the composer; hide them so the header stays uncluttered. */
+@media (max-width: 560px) {
+  .wrapper { display: none; }
+}

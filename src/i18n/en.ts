@@ -98,6 +98,11 @@ const en = {
   "aria.clearHistory": "Clear history",
   "aria.stopGeneration": "Stop generation",
 
+  // Layout controls
+  "layout.openSidebar": "Open conversations",
+  "layout.closeSidebar": "Close conversations",
+  "layout.togglePanel": "Toggle code panel",
+
   // Language toggle
   "lang.switch": "中文",
 

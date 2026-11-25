@@ -98,6 +98,11 @@ const zh = {
   "aria.clearHistory": "清除历史",
   "aria.stopGeneration": "停止生成",
 
+  // Layout controls
+  "layout.openSidebar": "打开会话列表",
+  "layout.closeSidebar": "关闭会话列表",
+  "layout.togglePanel": "展开/收起代码面板",
+
   // Language toggle
   "lang.switch": "English",
 

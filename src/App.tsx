@@ -123,6 +123,9 @@ function AppInner() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [debugEvents, setDebugEvents] = useState<RawSseEvent[]>([]);
   const [rightPanelMode, setRightPanelMode] = useState<'code' | 'debug'>('code');
+  // 布局开关：右侧代码/调试面板默认收起，窄屏侧栏改为抽屉
+  const [rightPanelOpen, setRightPanelOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   // 待补充信息弹窗：模型提交问题后弹出，用户填完自动回填成消息
   const [followups, setFollowups] = useState<string[] | null>(null);
 
@@ -650,7 +653,19 @@ function AppInner() {
       <div className={styles.blob1} />
       <div className={styles.blob2} />
 
-      <div className={styles.stage}>
+      {/* 移动端侧栏抽屉遮罩 */}
+      {sidebarOpen && (
+        <button
+          className={styles.sidebarBackdrop}
+          aria-label={t("layout.closeSidebar")}
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <div
+        className={`${styles.stage} ${rightPanelOpen ? styles.stageWithPanel : ''}`}
+        data-sidebar-open={sidebarOpen ? 'true' : undefined}
+      >
         <ConversationSidebar
           conversations={conversations}
           activeConversationId={activeConversationId}
@@ -658,8 +673,8 @@ function AppInner() {
           loadingMore={conversationsLoadingMore}
           hasMore={sidebarHasMore}
           disabled={loading}
-          onSelect={handleSelectConversation}
-          onCreate={handleCreateConversation}
+          onSelect={(id) => { handleSelectConversation(id); setSidebarOpen(false); }}
+          onCreate={() => { handleCreateConversation(); setSidebarOpen(false); }}
           onLoadMore={handleLoadMoreConversations}
           onDelete={handleDeleteConversation}
         />
@@ -667,13 +682,32 @@ function AppInner() {
         <div className={styles.chatPanel}>
           <header className={styles.header}>
             <div className={styles.headerLeft}>
+              <button
+                className={styles.iconButton}
+                aria-label={t("layout.openSidebar")}
+                title={t("layout.openSidebar")}
+                onClick={() => setSidebarOpen(true)}
+              >
+                <span className={styles.menuGlyph}>☰</span>
+              </button>
               <span className={styles.logo}>⬡</span>
               <div>
                 <p className={styles.title}>{t("app.title")}</p>
                 <p className={styles.subtitle}>{t("app.subtitle")}</p>
               </div>
             </div>
-            <ToolIndicators lamps={lamps} />
+            <div className={styles.headerRight}>
+              <ToolIndicators lamps={lamps} />
+              <button
+                className={`${styles.iconButton} ${rightPanelOpen ? styles.iconButtonActive : ''}`}
+                aria-label={t("layout.togglePanel")}
+                title={t("layout.togglePanel")}
+                aria-pressed={rightPanelOpen}
+                onClick={() => setRightPanelOpen(v => !v)}
+              >
+                <span className={styles.panelGlyph}>{'</>'}</span>
+              </button>
+            </div>
           </header>
 
           <div className={styles.chatWindowShell}>
@@ -687,13 +721,15 @@ function AppInner() {
           <ChatInput onSend={handleSend} onStop={handleStop} onClear={handleClearHistory} disabled={loading} />
         </div>
 
-        <div className={styles.codePanel}>
-          {rightPanelMode === 'code' ? (
-            <CodeViewer />
-          ) : (
-            <DebugPanel events={debugEvents} onClear={() => setDebugEvents([])} />
-          )}
-        </div>
+        {rightPanelOpen && (
+          <div className={styles.codePanel}>
+            {rightPanelMode === 'code' ? (
+              <CodeViewer />
+            ) : (
+              <DebugPanel events={debugEvents} onClear={() => setDebugEvents([])} />
+            )}
+          </div>
+        )}
       </div>
       <GitHubLink />
       <DeployLink />

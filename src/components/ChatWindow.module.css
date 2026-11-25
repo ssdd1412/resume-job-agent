@@ -7,45 +7,53 @@
   gap: 14px;
 }
 
-/* Empty state */
+/* Empty state — clean, readable welcome */
 .empty {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding-bottom: 40px;
-  opacity: .45;
+  gap: 14px;
+  padding: 24px 20px 48px;
   animation: fadeUp .5s ease both;
 }
 .emptyIcon {
-  font-size: 3rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  background: rgba(var(--accent-rgb), .10);
+  border: 1px solid var(--accent-gold-dim);
+  font-size: 2rem;
   color: var(--accent-gold);
-  filter: drop-shadow(0 0 12px var(--accent-gold-glow));
 }
 .emptyTitle {
   font-family: var(--font-display);
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   font-weight: 700;
-  letter-spacing: .08em;
-  color: var(--text-secondary);
-  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-primary);
+  text-align: center;
 }
 .emptyHint {
-  font-size: .75rem;
-  color: var(--text-muted);
-  letter-spacing: .04em;
-  max-width: 400px;
+  font-size: .78rem;
+  color: var(--text-secondary);
+  letter-spacing: .01em;
+  max-width: 520px;
   text-align: center;
-  line-height: 1.6;
+  line-height: 1.75;
 }
 .emptyFeatures {
   font-size: .68rem;
   color: var(--accent-gold);
   letter-spacing: .06em;
-  margin-top: 4px;
-  opacity: .7;
+  margin-top: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(var(--accent-rgb), .08);
 }
 
 /* Typing indicator */

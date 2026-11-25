@@ -63,35 +63,35 @@
 
 /* ── Base palette: LIGHT ────────────────────────────────────── */
 :root[data-mode="light"] {
-  --bg-base: #eef0f7;
+  --bg-base: #f5f7fa;
   --bg-surface: #ffffff;
-  --bg-elevated: #f6f7fb;
-  --bg-border: #dcdfea;
+  --bg-elevated: #f8fafc;
+  --bg-border: #e6eaf0;
 
-  --text-primary: #1c1d2b;
-  --text-secondary: #5a5d78;
-  --text-muted: #9a9db4;
+  --text-primary: #1e2637;
+  --text-secondary: #5b6579;
+  --text-muted: #9aa4b6;
 
-  --user-bubble: #eceaf7;
-  --user-border: #d6d2ec;
+  --user-bubble: #eaf1ff;
+  --user-border: #d3e2ff;
   --bot-bubble: #ffffff;
-  --bot-border: #e4e6f0;
+  --bot-border: #e8edf4;
 
-  --overlay-weak: rgba(20, 22, 45, .015);
-  --overlay-faint: rgba(20, 22, 45, .035);
-  --overlay-soft: rgba(20, 22, 45, .07);
-  --overlay-glass: rgba(20, 22, 45, .035);
-  --overlay-glass-hover: rgba(20, 22, 45, .07);
+  --overlay-weak: rgba(30, 45, 80, .02);
+  --overlay-faint: rgba(30, 45, 80, .035);
+  --overlay-soft: rgba(30, 45, 80, .06);
+  --overlay-glass: rgba(255, 255, 255, .5);
+  --overlay-glass-hover: rgba(255, 255, 255, .8);
 
-  --shadow-card: 0 10px 36px rgba(38, 42, 84, .14);
-  --code-inline-bg: rgba(20, 22, 45, .06);
-  --code-block-bg: rgba(20, 22, 45, .05);
-  --table-head-bg: rgba(20, 22, 45, .035);
-  --dialog-overlay: rgba(28, 29, 43, .38);
-  --blob-2: rgba(90, 74, 242, .06);
-  --sidebar-bg: rgba(255, 255, 255, .82);
-  --debug-panel-bg: rgba(255, 255, 255, .9);
-  --code-panel-bg: #faf8f2;
+  --shadow-card: 0 18px 60px rgba(38, 58, 105, .12), 0 2px 8px rgba(38, 58, 105, .05);
+  --code-inline-bg: rgba(30, 45, 80, .05);
+  --code-block-bg: rgba(30, 45, 80, .04);
+  --table-head-bg: rgba(30, 45, 80, .03);
+  --dialog-overlay: rgba(28, 40, 68, .32);
+  --blob-2: rgba(91, 140, 255, .10);
+  --sidebar-bg: rgba(255, 255, 255, .88);
+  --debug-panel-bg: rgba(255, 255, 255, .94);
+  --code-panel-bg: #fbfcfe;
 
   --on-accent: #ffffff;
   color-scheme: light;
@@ -204,6 +204,12 @@ html, body, #root {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--bg-border); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* Corner deployment badges — hide on narrow screens so they don't
+   overlap the chat footer hint. */
+@media (max-width: 700px) {
+  .floating-badge { display: none !important; }
+}
 
 /* ── Floating controls cluster (top-right) ─────────────────── */
 .floating-controls {

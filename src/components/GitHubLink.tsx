@@ -21,6 +21,7 @@ export default function GitHubLink() {
       href={REPO_URL}
       target='_blank'
       rel='noopener noreferrer'
+      className='floating-badge'
       aria-label={label}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
