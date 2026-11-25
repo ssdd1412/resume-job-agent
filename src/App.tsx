@@ -711,7 +711,12 @@ function AppInner() {
           </header>
 
           <div className={styles.chatWindowShell}>
-            <ChatWindow messages={messages} loading={loading} conversationId={conversationIdRef.current} />
+            <ChatWindow
+              messages={messages}
+              loading={loading}
+              conversationId={conversationIdRef.current}
+              onQuickAsk={(text) => { void handleSend(text); }}
+            />
             {historyLoading && messages.length === 0 && (
               <div className={styles.historyOverlay}>
                 <div className={styles.historySpinner} />
